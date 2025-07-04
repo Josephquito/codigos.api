@@ -7,12 +7,12 @@ import { ImapSimple, Message } from 'imap-simple';
 export class ImapService {
   private readonly config: imaps.ImapSimpleOptions = {
     imap: {
-      user: 'global@jotavix.com',
-      password: 'Ellayyo.1234@', // asegúrate que sea la correcta
-      host: 'premium31-5.web-hosting.com',
-      port: 993,
+      user: process.env.HOST_EMAIL,
+      password: process.env.HOST_PASSWORD,
+      host: process.env.IMAP_HOST,
+      port: Number(process.env.IMAP_PORT) || 993,
       tls: true,
-      tlsOptions: { rejectUnauthorized: false }, // evita error TLS
+      tlsOptions: { rejectUnauthorized: false },
       authTimeout: 3000,
     },
   };
