@@ -61,6 +61,8 @@ export class ImapService {
       const imap = (await imaps.connect(this.config)) as ImapSimple;
       await imap.openBox('INBOX');
 
+      const twelveHoursAgo = Date.now() - 12 * 60 * 60 * 1000;
+
       const messages = (await imap.search(['ALL'], {
         bodies: [''],
         markSeen: false,
@@ -79,8 +81,8 @@ export class ImapService {
 
         const parsed: ParsedMail = await simpleParser(bodyPart.body as Source);
 
+        // Obtener dirección del destinatario
         let toAddress: string | undefined;
-
         if (Array.isArray(parsed.to)) {
           toAddress = (parsed.to[0] as any)?.address?.toLowerCase();
         } else if (parsed.to && 'value' in parsed.to) {
@@ -88,10 +90,13 @@ export class ImapService {
         }
 
         const from = parsed.from?.text?.toLowerCase() || '';
+        const receivedDate = parsed.date?.getTime() || 0;
 
+        // Aplicar los filtros
         if (
           toAddress === alias.toLowerCase() &&
-          from.includes(platform.toLowerCase()) // filtro por plataforma en remitente
+          from.includes(platform.toLowerCase()) &&
+          receivedDate > twelveHoursAgo
         ) {
           result.push(
             parsed.html ||
@@ -104,9 +109,9 @@ export class ImapService {
 
       return result.length
         ? result
-        : [`<p>No hay correos de ${platform} para ${alias}</p>`];
+        : [`<p>No hay correos recientes de ${platform} para ${alias}</p>`];
     } catch (error) {
-      console.error('❌ Error filtrando por alias + plataforma:', error);
+      console.error('❌ Error filtrando por alias + plataforma + hora:', error);
       return ['<p>Error al filtrar correos</p>'];
     }
   }
