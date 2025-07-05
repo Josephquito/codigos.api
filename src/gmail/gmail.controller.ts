@@ -4,7 +4,7 @@ import { AuthService } from '../auth/auth.service';
 import { GmailService } from './gmail.service';
 import { Response } from 'express';
 
-@Controller('gmail')
+@Controller()
 export class GmailController {
   constructor(
     private readonly authService: AuthService,
