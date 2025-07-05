@@ -70,8 +70,8 @@ export class ImapService {
         try {
           await imap.closeBox(true);
           imap.end();
-        } catch (err) {
-          console.error('❌ Error cerrando conexión IMAP:', err);
+        } catch (closeErr) {
+          console.error('Error cerrando IMAP:', closeErr);
         }
       }
     }
@@ -136,8 +136,8 @@ export class ImapService {
         try {
           await imap.closeBox(true);
           imap.end();
-        } catch (err) {
-          console.error('❌ Error cerrando conexión IMAP:', err);
+        } catch (closeErr) {
+          console.error('Error cerrando IMAP:', closeErr);
         }
       }
     }
@@ -183,8 +183,8 @@ export class ImapService {
         try {
           await imap.closeBox(true);
           imap.end();
-        } catch (err) {
-          console.error('❌ Error cerrando conexión IMAP:', err);
+        } catch (closeErr) {
+          console.error('Error cerrando IMAP:', closeErr);
         }
       }
     }
