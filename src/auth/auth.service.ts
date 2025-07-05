@@ -1,72 +1,59 @@
-// src/auth/auth.service.ts
+import { Injectable } from '@nestjs/common';
+import { google } from 'googleapis';
+import { InjectRepository } from '@nestjs/typeorm';
+import { Repository } from 'typeorm';
+import { Credentials } from 'google-auth-library';
+import { GmailToken } from '../gmail/entities/gmail-token.entity';
+
 interface OAuthCredentials {
   client_id: string;
   client_secret: string;
   redirect_uris: string[];
 }
-import { Injectable } from '@nestjs/common';
-import { google } from 'googleapis';
-import * as fs from 'fs';
-import * as path from 'path';
-import { Credentials } from 'google-auth-library';
 
 @Injectable()
 export class AuthService {
   private SCOPES = ['https://www.googleapis.com/auth/gmail.readonly'];
-  private credentialsPath = path.join(
-    process.cwd(),
-    'src',
-    'auth',
-    'credentials.json',
-  );
-  private tokenDir = path.join(process.cwd(), 'src', 'auth', 'tokens');
 
-  constructor() {
-    if (!fs.existsSync(this.tokenDir)) {
-      fs.mkdirSync(this.tokenDir);
-    }
-  }
+  constructor(
+    @InjectRepository(GmailToken)
+    private readonly tokenRepo: Repository<GmailToken>,
+  ) {}
 
   getOAuthClient() {
-    const content = fs.readFileSync(this.credentialsPath, 'utf8');
-    const credentials = JSON.parse(content) as { web: OAuthCredentials };
+    const raw = process.env.GOOGLE_CREDENTIALS;
+    if (!raw) throw new Error('GOOGLE_CREDENTIALS no está definido');
+    const credentials = JSON.parse(raw) as { web: OAuthCredentials };
     const { client_id, client_secret, redirect_uris } = credentials.web;
-
-    return new google.auth.OAuth2(
-      client_id,
-      client_secret,
-      redirect_uris[0], // http://localhost:3000/auth/google/callback
-    );
+    return new google.auth.OAuth2(client_id, client_secret, redirect_uris[0]);
   }
 
-  generateAuthUrl(email: string) {
-    const oauth2Client = this.getOAuthClient();
-    return oauth2Client.generateAuthUrl({
+  generateAuthUrl(email: string): string {
+    const client = this.getOAuthClient();
+    return client.generateAuthUrl({
       access_type: 'offline',
       scope: this.SCOPES,
-      state: email, // Para saber qué correo está autorizando
+      state: email,
     });
   }
 
   async getTokenFromCode(code: string, email: string) {
-    const oauth2Client = this.getOAuthClient();
-    const { tokens } = await oauth2Client.getToken(code);
-    this.saveToken(email, tokens);
+    const client = this.getOAuthClient();
+    const { tokens } = await client.getToken(code);
+    await this.saveToken(email, tokens);
     return tokens;
   }
 
-  saveToken(email: string, tokens: any) {
-    const file = path.join(this.tokenDir, `${email}.json`);
-    fs.writeFileSync(file, JSON.stringify(tokens));
+  async saveToken(email: string, token: Credentials): Promise<void> {
+    await this.tokenRepo.save({ email, tokens: token });
   }
 
-  loadToken(email: string) {
-    const file = path.join(this.tokenDir, `${email}.json`);
-    if (!fs.existsSync(file)) return null;
+  async loadToken(email: string) {
+    const entry = await this.tokenRepo.findOne({ where: { email } });
+    if (!entry) return null;
 
-    const oauth2Client = this.getOAuthClient();
-    const tokens = JSON.parse(fs.readFileSync(file, 'utf8')) as Credentials;
-    oauth2Client.setCredentials(tokens);
-    return oauth2Client;
+    const client = this.getOAuthClient();
+    client.setCredentials(entry.token as Credentials); // ✅ CORRECTO: entry.token, no entry.tokens
+    return client;
   }
 }

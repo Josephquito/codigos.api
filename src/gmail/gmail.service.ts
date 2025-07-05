@@ -14,7 +14,7 @@ export class GmailService {
   }
 
   async getLastEmailHtml(email: string): Promise<string> {
-    const auth = this.authService.loadToken(email);
+    const auth = await this.authService.loadToken(email); // 👈 AÑADIR AWAIT
     if (!auth) {
       throw new Error(`❌ No hay token guardado para el correo: ${email}`);
     }

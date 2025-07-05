@@ -4,7 +4,7 @@ import { AuthService } from '../auth/auth.service';
 import { GmailService } from './gmail.service';
 import { Response } from 'express';
 
-@Controller()
+@Controller('gmail')
 export class GmailController {
   constructor(
     private readonly authService: AuthService,
@@ -27,7 +27,7 @@ export class GmailController {
     return res.send(`✅ Cuenta autorizada: ${email}`);
   }
 
-  @Get('gmail/last/:email')
+  @Get('last/:email')
   async getLastEmail(@Param('email') email: string) {
     const html = await this.gmailService.getLastEmailHtml(email);
     return { html };
