@@ -1,6 +1,6 @@
-import { Controller, Get, Query, Param, Res } from '@nestjs/common';
-import { AuthService } from '../auth/auth.service';
+import { Controller, Get, Param, Query, Res } from '@nestjs/common';
 import { GmailService } from './gmail.service';
+import { AuthService } from '../auth/auth.service';
 import { Response } from 'express';
 
 @Controller('gmail')
@@ -32,8 +32,9 @@ export class GmailController {
     return { html };
   }
 
-  @Get('filter/:email/:platform')
-  async filterByPlatform(
+  // ✅ Ruta nueva igual a la de IMAP
+  @Get('alias/:email/platform/:platform')
+  async filterGmailAliasPlatform(
     @Param('email') email: string,
     @Param('platform') platform: string,
   ) {
