@@ -8,7 +8,6 @@ import { ImapAccountService } from '../imap-account/imap-account.service';
 export class ImapService {
   constructor(private readonly imapAccountService: ImapAccountService) {}
 
-  // Config para cuenta IMAP fija
   private readonly config: imaps.ImapSimpleOptions = {
     imap: {
       user: process.env.HOST_EMAIL,
@@ -21,7 +20,6 @@ export class ImapService {
     },
   };
 
-  // Config dinámica (para cuentas personalizadas)
   private getDynamicConfig(
     email: string,
     password: string,
@@ -39,10 +37,10 @@ export class ImapService {
     };
   }
 
-  // Último correo de cuenta principal (global@jotavix.com)
   async getLastEmailHtml(): Promise<string> {
+    let imap: ImapSimple;
     try {
-      const imap = await imaps.connect(this.config);
+      imap = await imaps.connect(this.config);
       await imap.openBox('INBOX');
 
       const messages = await imap.search(['ALL'], {
@@ -53,11 +51,7 @@ export class ImapService {
       if (!messages.length) return '<p>No hay mensajes</p>';
 
       const latest = messages[messages.length - 1];
-      const parts = latest.parts as {
-        which: string;
-        size: number;
-        body: string | Buffer;
-      }[];
+      const parts = latest.parts as any[];
       const bodyPart = parts.find((part) => part.which === '');
       if (!bodyPart) return '<p>Correo vacío</p>';
 
@@ -71,16 +65,25 @@ export class ImapService {
     } catch (error) {
       console.error('❌ Error leyendo correo:', error);
       return '<p>Error al leer el correo</p>';
+    } finally {
+      if (imap) {
+        try {
+          await imap.closeBox(true);
+          imap.end();
+        } catch (err) {
+          console.error('❌ Error cerrando conexión IMAP:', err);
+        }
+      }
     }
   }
 
-  // Filtrado para cuenta fija (por alias + plataforma + 12h)
   async getEmailsForAliasFromPlatform(
     alias: string,
     platform: string,
   ): Promise<string[]> {
+    let imap: ImapSimple;
     try {
-      const imap = await imaps.connect(this.config);
+      imap = await imaps.connect(this.config);
       await imap.openBox('INBOX');
 
       const twelveHoursAgo = Date.now() - 12 * 60 * 60 * 1000;
@@ -92,17 +95,12 @@ export class ImapService {
       const result: string[] = [];
 
       for (const msg of messages) {
-        const parts = msg.parts as {
-          which: string;
-          size: number;
-          body: string | Buffer;
-        }[];
+        const parts = msg.parts as any[];
         const bodyPart = parts.find((part) => part.which === '');
         if (!bodyPart) continue;
 
         const parsed: ParsedMail = await simpleParser(bodyPart.body as Source);
 
-        // Destinatario
         let toAddress: string | undefined;
         if (Array.isArray(parsed.to)) {
           toAddress = (parsed.to[0] as any)?.address?.toLowerCase();
@@ -133,18 +131,27 @@ export class ImapService {
     } catch (error) {
       console.error('❌ Error filtrando correos:', error);
       return ['<p>Error al filtrar correos</p>'];
+    } finally {
+      if (imap) {
+        try {
+          await imap.closeBox(true);
+          imap.end();
+        } catch (err) {
+          console.error('❌ Error cerrando conexión IMAP:', err);
+        }
+      }
     }
   }
 
-  // Último correo de cuenta registrada en imap_accounts
   async getLastEmailFromRegisteredAccount(email: string): Promise<string> {
     const account = await this.imapAccountService.getByEmail(email);
     if (!account) {
       return `<p>❌ No se encontró la cuenta ${email}</p>`;
     }
 
+    let imap: ImapSimple;
     try {
-      const imap = await imaps.connect(
+      imap = await imaps.connect(
         this.getDynamicConfig(account.email, account.password),
       );
       await imap.openBox('INBOX');
@@ -157,11 +164,7 @@ export class ImapService {
       if (!messages.length) return '<p>No hay mensajes</p>';
 
       const latest = messages[messages.length - 1];
-      const parts = latest.parts as {
-        which: string;
-        size: number;
-        body: string | Buffer;
-      }[];
+      const parts = latest.parts as any[];
       const bodyPart = parts.find((part) => part.which === '');
       if (!bodyPart) return '<p>Correo vacío</p>';
 
@@ -175,6 +178,15 @@ export class ImapService {
     } catch (err) {
       console.error('❌ Error leyendo correo IMAP:', err);
       return '<p>Error al leer el correo</p>';
+    } finally {
+      if (imap) {
+        try {
+          await imap.closeBox(true);
+          imap.end();
+        } catch (err) {
+          console.error('❌ Error cerrando conexión IMAP:', err);
+        }
+      }
     }
   }
 }
