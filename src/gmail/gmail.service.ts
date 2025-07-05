@@ -1,67 +1,39 @@
 // src/gmail/gmail.service.ts
 import { Injectable } from '@nestjs/common';
 import { google } from 'googleapis';
-import { AuthService } from '../auth/auth.service';
 import { simpleParser, ParsedMail } from 'mailparser';
+import { AuthService } from '../auth/auth.service';
 import { Buffer } from 'buffer';
 
 @Injectable()
 export class GmailService {
   constructor(private readonly authService: AuthService) {}
 
-  getAuthUrl(email: string): string {
-    return this.authService.generateAuthUrl(email);
-  }
-
-  async getLastEmailHtml(email: string): Promise<string> {
-    const auth = await this.authService.loadToken(email);
-    if (!auth) throw new Error(`❌ No hay token guardado para: ${email}`);
-
-    const gmail = google.gmail({ version: 'v1', auth });
-    const res = await gmail.users.messages.list({
-      userId: 'me',
-      maxResults: 1,
-    });
-
-    const msgId = res.data.messages?.[0]?.id;
-    if (!msgId) return '<p>No se encontraron mensajes</p>';
-
-    const rawMsg = await gmail.users.messages.get({
-      userId: 'me',
-      id: msgId,
-      format: 'raw',
-    });
-
-    const raw = rawMsg.data.raw;
-    if (!raw) return '<p>Correo vacío</p>';
-
-    const parsed: ParsedMail = await simpleParser(Buffer.from(raw, 'base64'));
-
-    return (
-      parsed.html || parsed.textAsHtml || parsed.text || '<p>Sin contenido</p>'
-    );
-  }
-
   async getEmailsForAliasFromPlatform(
-    email: string,
+    alias: string,
     platform: string,
   ): Promise<string[]> {
-    const auth = await this.authService.loadToken(email);
-    if (!auth) throw new Error(`❌ No hay token guardado para: ${email}`);
+    const auth = await this.authService.loadToken(alias);
+    if (!auth) {
+      return [`<p>❌ No se encontró token para ${alias}</p>`];
+    }
 
     const gmail = google.gmail({ version: 'v1', auth });
+
     const twelveHoursAgo = Date.now() - 12 * 60 * 60 * 1000;
 
     const listRes = await gmail.users.messages.list({
       userId: 'me',
-      maxResults: 30,
+      maxResults: 20,
       q: 'newer_than:12h',
     });
 
-    const messageIds = listRes.data.messages?.map((m) => m.id) || [];
+    const messageIds = listRes.data.messages?.map((m) => m.id) ?? [];
     const results: string[] = [];
 
     for (const id of messageIds) {
+      if (!id) continue;
+
       const res = await gmail.users.messages.get({
         userId: 'me',
         id,
@@ -73,16 +45,21 @@ export class GmailService {
 
       const parsed: ParsedMail = await simpleParser(Buffer.from(raw, 'base64'));
 
-      const to =
-        parsed.to?.[0]?.address?.toLowerCase() ||
-        parsed.to?.value?.[0]?.address?.toLowerCase() ||
-        '';
+      // Obtener dirección del destinatario
+      let toAddress = '';
+      try {
+        if (Array.isArray(parsed.to)) {
+          toAddress = (parsed.to[0] as any)?.address?.toLowerCase();
+        } else if ('value' in parsed.to!) {
+          toAddress = (parsed.to as any).value?.[0]?.address?.toLowerCase();
+        }
+      } catch (e) {}
 
       const from = parsed.from?.text?.toLowerCase() || '';
       const date = parsed.date?.getTime() || 0;
 
       if (
-        to === email.toLowerCase() &&
+        toAddress === alias.toLowerCase() &&
         from.includes(platform.toLowerCase()) &&
         date > twelveHoursAgo
       ) {
@@ -97,6 +74,42 @@ export class GmailService {
 
     return results.length
       ? results
-      : [`<p>No hay correos recientes de ${platform} para ${email}</p>`];
+      : [`<p>❌ No hay correos recientes de ${platform} para ${alias}</p>`];
+  }
+
+  async getLastEmailHtml(email: string): Promise<string> {
+    const auth = await this.authService.loadToken(email);
+    if (!auth) throw new Error(`No se encontró token para ${email}`);
+
+    const gmail = google.gmail({ version: 'v1', auth });
+
+    const list = await gmail.users.messages.list({
+      userId: 'me',
+      maxResults: 1,
+    });
+
+    const id = list.data.messages?.[0]?.id;
+    if (!id) throw new Error('No hay mensajes recientes');
+
+    const msg = await gmail.users.messages.get({
+      userId: 'me',
+      id,
+      format: 'raw',
+    });
+
+    const raw = msg.data.raw;
+    if (!raw) throw new Error('Correo vacío');
+
+    const parsed: ParsedMail = await simpleParser(Buffer.from(raw, 'base64'));
+    return (
+      parsed.html ||
+      parsed.textAsHtml ||
+      parsed.text ||
+      '<p>Correo sin contenido</p>'
+    );
+  }
+
+  getAuthUrl(email: string): string {
+    return this.authService.generateAuthUrl(email);
   }
 }
