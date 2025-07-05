@@ -18,25 +18,25 @@ export class GmailService {
     if (!auth) throw new Error(`❌ No hay token guardado para: ${email}`);
 
     const gmail = google.gmail({ version: 'v1', auth });
-    const response = await gmail.users.messages.list({
+    const res = await gmail.users.messages.list({
       userId: 'me',
       maxResults: 1,
     });
 
-    const messageId = response.data.messages?.[0]?.id;
-    if (!messageId) return '<p>No se encontraron mensajes</p>';
+    const msgId = res.data.messages?.[0]?.id;
+    if (!msgId) return '<p>No se encontraron mensajes</p>';
 
-    const message = await gmail.users.messages.get({
+    const rawMsg = await gmail.users.messages.get({
       userId: 'me',
-      id: messageId,
+      id: msgId,
       format: 'raw',
     });
 
-    const raw = message.data.raw;
+    const raw = rawMsg.data.raw;
     if (!raw) return '<p>Correo vacío</p>';
 
-    const buffer = Buffer.from(raw, 'base64');
-    const parsed: ParsedMail = await simpleParser(buffer);
+    const parsed: ParsedMail = await simpleParser(Buffer.from(raw, 'base64'));
+
     return (
       parsed.html || parsed.textAsHtml || parsed.text || '<p>Sin contenido</p>'
     );
@@ -54,26 +54,30 @@ export class GmailService {
 
     const listRes = await gmail.users.messages.list({
       userId: 'me',
-      maxResults: 20,
-      q: `newer_than:12h`,
+      maxResults: 30,
+      q: 'newer_than:12h',
     });
 
     const messageIds = listRes.data.messages?.map((m) => m.id) || [];
     const results: string[] = [];
 
     for (const id of messageIds) {
-      const msg = await gmail.users.messages.get({
+      const res = await gmail.users.messages.get({
         userId: 'me',
         id,
         format: 'raw',
       });
 
-      const raw = msg.data.raw;
+      const raw = res.data.raw;
       if (!raw) continue;
 
       const parsed: ParsedMail = await simpleParser(Buffer.from(raw, 'base64'));
 
-      const to = parsed.to?.value?.[0]?.address?.toLowerCase();
+      const to =
+        parsed.to?.[0]?.address?.toLowerCase() ||
+        parsed.to?.value?.[0]?.address?.toLowerCase() ||
+        '';
+
       const from = parsed.from?.text?.toLowerCase() || '';
       const date = parsed.date?.getTime() || 0;
 

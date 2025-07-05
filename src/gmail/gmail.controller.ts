@@ -1,4 +1,3 @@
-// src/gmail/gmail.controller.ts
 import { Controller, Get, Query, Param, Res } from '@nestjs/common';
 import { AuthService } from '../auth/auth.service';
 import { GmailService } from './gmail.service';
@@ -14,7 +13,7 @@ export class GmailController {
   @Get('login/:email')
   login(@Param('email') email: string, @Res() res: Response) {
     const url = this.gmailService.getAuthUrl(email);
-    res.redirect(url); // ✅ Redirige automáticamente a Google
+    res.redirect(url);
   }
 
   @Get('auth/google/callback')
@@ -31,5 +30,17 @@ export class GmailController {
   async getLastEmail(@Param('email') email: string) {
     const html = await this.gmailService.getLastEmailHtml(email);
     return { html };
+  }
+
+  @Get('filter/:email/:platform')
+  async filterByPlatform(
+    @Param('email') email: string,
+    @Param('platform') platform: string,
+  ) {
+    const correos = await this.gmailService.getEmailsForAliasFromPlatform(
+      email,
+      platform,
+    );
+    return { correos };
   }
 }
