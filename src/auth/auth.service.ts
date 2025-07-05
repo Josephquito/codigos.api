@@ -45,7 +45,7 @@ export class AuthService {
   }
 
   async saveToken(email: string, token: Credentials): Promise<void> {
-    await this.tokenRepo.save({ email, tokens: token });
+    await this.tokenRepo.save({ email, token }); // ✅ campo correcto
   }
 
   async loadToken(email: string) {
