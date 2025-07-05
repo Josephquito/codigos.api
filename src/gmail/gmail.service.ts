@@ -10,26 +10,21 @@ export class GmailService {
   constructor(private readonly authService: AuthService) {}
 
   getAuthUrl(email: string): string {
-    return this.authService.generateAuthUrl(email); // 👈 usa el método que tengas para generar el cliente OAuth
+    return this.authService.generateAuthUrl(email);
   }
 
   async getLastEmailHtml(email: string): Promise<string> {
-    const auth = await this.authService.loadToken(email); // 👈 AÑADIR AWAIT
-    if (!auth) {
-      throw new Error(`❌ No hay token guardado para el correo: ${email}`);
-    }
+    const auth = await this.authService.loadToken(email);
+    if (!auth) throw new Error(`❌ No hay token guardado para: ${email}`);
 
     const gmail = google.gmail({ version: 'v1', auth });
-
     const response = await gmail.users.messages.list({
       userId: 'me',
       maxResults: 1,
     });
 
     const messageId = response.data.messages?.[0]?.id;
-    if (!messageId) {
-      throw new Error('📭 No se encontraron mensajes recientes');
-    }
+    if (!messageId) return '<p>No se encontraron mensajes</p>';
 
     const message = await gmail.users.messages.get({
       userId: 'me',
@@ -38,20 +33,66 @@ export class GmailService {
     });
 
     const raw = message.data.raw;
-    if (!raw) {
-      throw new Error('📄 No se pudo obtener el contenido del correo');
-    }
+    if (!raw) return '<p>Correo vacío</p>';
 
     const buffer = Buffer.from(raw, 'base64');
-    let parsedHtml = '<p>(Correo sin contenido HTML)</p>';
+    const parsed: ParsedMail = await simpleParser(buffer);
+    return (
+      parsed.html || parsed.textAsHtml || parsed.text || '<p>Sin contenido</p>'
+    );
+  }
 
-    try {
-      const parsed: ParsedMail = await simpleParser(buffer);
-      parsedHtml = parsed.html || parsed.textAsHtml || parsedHtml;
-    } catch (err) {
-      console.error('Error al parsear el correo:', err);
+  async getEmailsForAliasFromPlatform(
+    email: string,
+    platform: string,
+  ): Promise<string[]> {
+    const auth = await this.authService.loadToken(email);
+    if (!auth) throw new Error(`❌ No hay token guardado para: ${email}`);
+
+    const gmail = google.gmail({ version: 'v1', auth });
+    const twelveHoursAgo = Date.now() - 12 * 60 * 60 * 1000;
+
+    const listRes = await gmail.users.messages.list({
+      userId: 'me',
+      maxResults: 20,
+      q: `newer_than:12h`,
+    });
+
+    const messageIds = listRes.data.messages?.map((m) => m.id) || [];
+    const results: string[] = [];
+
+    for (const id of messageIds) {
+      const msg = await gmail.users.messages.get({
+        userId: 'me',
+        id,
+        format: 'raw',
+      });
+
+      const raw = msg.data.raw;
+      if (!raw) continue;
+
+      const parsed: ParsedMail = await simpleParser(Buffer.from(raw, 'base64'));
+
+      const to = parsed.to?.value?.[0]?.address?.toLowerCase();
+      const from = parsed.from?.text?.toLowerCase() || '';
+      const date = parsed.date?.getTime() || 0;
+
+      if (
+        to === email.toLowerCase() &&
+        from.includes(platform.toLowerCase()) &&
+        date > twelveHoursAgo
+      ) {
+        results.push(
+          parsed.html ||
+            parsed.textAsHtml ||
+            parsed.text ||
+            '<p>Correo sin contenido</p>',
+        );
+      }
     }
 
-    return parsedHtml;
+    return results.length
+      ? results
+      : [`<p>No hay correos recientes de ${platform} para ${email}</p>`];
   }
 }
