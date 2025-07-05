@@ -8,6 +8,7 @@ import { ImapModule } from './imap/imap.module';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { GmailToken } from './gmail/entities/gmail-token.entity';
 import { GmailTokenService } from './gmail/gmail-token.service';
+import { ImapAccountModule } from './imap-account/imap-account.module';
 import * as dotenv from 'dotenv';
 dotenv.config();
 console.log('DB_PASS', process.env.DB_PASS, typeof process.env.DB_PASS);
@@ -34,6 +35,7 @@ console.log('DB_PASS', process.env.DB_PASS, typeof process.env.DB_PASS);
     GmailModule,
     AuthModule,
     ImapModule,
+    ImapAccountModule,
   ],
   controllers: [AppController],
   providers: [AppService, GmailTokenService],

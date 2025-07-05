@@ -17,4 +17,9 @@ export class ImapController {
   ): Promise<string[]> {
     return this.imapService.getEmailsForAliasFromPlatform(email, platform);
   }
+
+  @Get('last/:email')
+  async getLastEmailFromRegistered(@Param('email') email: string) {
+    return await this.imapService.getLastEmailFromRegisteredAccount(email);
+  }
 }
