@@ -6,10 +6,9 @@ import { GmailService } from '../gmail/gmail.service';
 
 import { AuthModule } from 'src/auth/auth.module';
 import { ImapAccountModule } from 'src/imap-account/imap-account.module';
-import { AuthService } from 'src/auth/auth.service';
 
 @Module({
-  imports: [ImapAccountModule, AuthModule, AuthService],
+  imports: [ImapAccountModule, AuthModule],
   controllers: [CorreoController],
   providers: [CorreoService, ImapService, GmailService],
 })
