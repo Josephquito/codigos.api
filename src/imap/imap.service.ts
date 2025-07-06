@@ -239,34 +239,25 @@ export class ImapService {
 
         const parsed: ParsedMail = await simpleParser(bodyPart.body as Source);
 
-        let toAddress = '';
-        try {
-          if (Array.isArray(parsed.to)) {
-            toAddress = (parsed.to[0] as any)?.address?.toLowerCase();
-          } else if ('value' in parsed.to!) {
-            toAddress = (parsed.to as any).value?.[0]?.address?.toLowerCase();
-          }
-        } catch {}
-
         const fromText = parsed.from?.text?.toLowerCase() || '';
         const fromAddress =
           parsed.from?.value?.[0]?.address?.toLowerCase() || '';
         const receivedDate = parsed.date?.getTime() || 0;
 
-        const isAliasMatch = toAddress.includes(email.toLowerCase());
         const isRemitenteMatch = posibles.some(
           (remitente) =>
             fromText.includes(remitente) || fromAddress.includes(remitente),
         );
-        console.log('📩 DEBUG completo');
-        console.log('→ Fecha:', parsed.date?.toString());
-        console.log('→ To:', parsed.to);
-        console.log('→ From:', parsed.from);
-        console.log('→ Email buscado:', email.toLowerCase());
-        console.log('→ Remitentes esperados:', posibles);
-        console.log('-----------------------------------');
 
-        if (isAliasMatch && isRemitenteMatch && receivedDate > twelveHoursAgo) {
+        // DEBUG opcional
+        console.log('📩 DEBUG IMAP registrado:');
+        console.log('→ From:', parsed.from);
+        console.log('→ Date:', parsed.date);
+        console.log('→ Coincide remitente:', isRemitenteMatch);
+        console.log('→ ¿Dentro de 12h?', receivedDate > twelveHoursAgo);
+        console.log('----------------------------------');
+
+        if (isRemitenteMatch && receivedDate > twelveHoursAgo) {
           result.push({
             content:
               parsed.html ||
