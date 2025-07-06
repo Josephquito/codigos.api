@@ -22,4 +22,15 @@ export class ImapController {
   async getLastEmailFromRegistered(@Param('email') email: string) {
     return await this.imapService.getLastEmailFromRegisteredAccount(email);
   }
+
+  @Get('imap/registered/:email/platform/:platform')
+  getRegisteredByPlatform(
+    @Param('email') email: string,
+    @Param('platform') platform: string,
+  ) {
+    return this.imapService.getEmailsFromRegisteredAccountByPlatform(
+      email,
+      platform,
+    );
+  }
 }

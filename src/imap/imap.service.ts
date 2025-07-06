@@ -197,4 +197,72 @@ export class ImapService {
       }
     }
   }
+  async getEmailsFromRegisteredAccountByPlatform(
+    email: string,
+    platform: string,
+  ): Promise<string[]> {
+    const account = await this.imapAccountService.getByEmail(email);
+    if (!account) {
+      return [`<p>❌ No se encontró la cuenta ${email}</p>`];
+    }
+
+    let imap: ImapSimple;
+    try {
+      imap = await imaps.connect(
+        this.getDynamicConfig(account.email, account.password),
+      );
+      await imap.openBox('INBOX');
+
+      const twelveHoursAgo = Date.now() - 12 * 60 * 60 * 1000;
+      const messages = await imap.search(['ALL'], {
+        bodies: [''],
+        markSeen: false,
+      });
+
+      const result: string[] = [];
+      const platformLower = platform.toLowerCase();
+
+      for (const msg of messages) {
+        const parts = msg.parts as any[];
+        const bodyPart = parts.find((part) => part.which === '');
+        if (!bodyPart) continue;
+
+        const parsed: ParsedMail = await simpleParser(bodyPart.body as Source);
+
+        const fromText = parsed.from?.text?.toLowerCase() || '';
+        const fromAddress =
+          parsed.from?.value?.[0]?.address?.toLowerCase() || '';
+        const receivedDate = parsed.date?.getTime() || 0;
+
+        const isPlatformMatch =
+          fromText.includes(platformLower) ||
+          fromAddress.includes(platformLower);
+
+        if (isPlatformMatch && receivedDate > twelveHoursAgo) {
+          result.push(
+            parsed.html ||
+              parsed.textAsHtml ||
+              parsed.text ||
+              '<p>Correo sin contenido</p>',
+          );
+        }
+      }
+
+      return result.length
+        ? result
+        : [`<p>❌ No hay correos recientes de ${platform} para ${email}</p>`];
+    } catch (error) {
+      console.error('❌ Error filtrando correos dinámicamente:', error);
+      return ['<p>Error al filtrar correos</p>'];
+    } finally {
+      if (imap) {
+        try {
+          await imap.closeBox(true);
+          imap.end();
+        } catch (closeErr) {
+          console.error('Error cerrando IMAP:', closeErr);
+        }
+      }
+    }
+  }
 }
