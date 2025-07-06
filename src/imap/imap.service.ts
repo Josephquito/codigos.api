@@ -258,6 +258,13 @@ export class ImapService {
           (remitente) =>
             fromText.includes(remitente) || fromAddress.includes(remitente),
         );
+        console.log('📩 DEBUG completo');
+        console.log('→ Fecha:', parsed.date?.toString());
+        console.log('→ To:', parsed.to);
+        console.log('→ From:', parsed.from);
+        console.log('→ Email buscado:', email.toLowerCase());
+        console.log('→ Remitentes esperados:', posibles);
+        console.log('-----------------------------------');
 
         if (isAliasMatch && isRemitenteMatch && receivedDate > twelveHoursAgo) {
           result.push({
