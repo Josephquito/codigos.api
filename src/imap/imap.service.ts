@@ -3,6 +3,7 @@ import * as imaps from 'imap-simple';
 import { simpleParser, ParsedMail, Source } from 'mailparser';
 import { ImapSimple, Message } from 'imap-simple';
 import { ImapAccountService } from '../imap-account/imap-account.service';
+import { REMITENTES_POR_PLATAFORMA } from '../utils/remitentes-plataformas';
 
 @Injectable()
 export class ImapService {
@@ -118,12 +119,15 @@ export class ImapService {
           parsed.from?.value?.[0]?.address?.toLowerCase() || '';
         const receivedDate = parsed.date?.getTime() || 0;
 
-        const isAliasMatch = toAddress.includes(alias.toLowerCase());
-        const isPlatformMatch =
-          fromText.includes(platformLower) ||
-          fromAddress.includes(platformLower);
+        const posibles = REMITENTES_POR_PLATAFORMA[platformLower] || [];
 
-        if (isAliasMatch && isPlatformMatch && receivedDate > twelveHoursAgo) {
+        const isAliasMatch = toAddress.includes(alias.toLowerCase());
+        const isRemitenteMatch = posibles.some(
+          (remitente) =>
+            fromText.includes(remitente) || fromAddress.includes(remitente),
+        );
+
+        if (isAliasMatch && isRemitenteMatch && receivedDate > twelveHoursAgo) {
           result.push(
             parsed.html ||
               parsed.textAsHtml ||
@@ -234,11 +238,14 @@ export class ImapService {
           parsed.from?.value?.[0]?.address?.toLowerCase() || '';
         const receivedDate = parsed.date?.getTime() || 0;
 
-        const isPlatformMatch =
-          fromText.includes(platformLower) ||
-          fromAddress.includes(platformLower);
+        const posibles = REMITENTES_POR_PLATAFORMA[platformLower] || [];
 
-        if (isPlatformMatch && receivedDate > twelveHoursAgo) {
+        const isRemitenteMatch = posibles.some(
+          (remitente) =>
+            fromText.includes(remitente) || fromAddress.includes(remitente),
+        );
+
+        if (isRemitenteMatch && receivedDate > twelveHoursAgo) {
           result.push(
             parsed.html ||
               parsed.textAsHtml ||
