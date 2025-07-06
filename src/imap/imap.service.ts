@@ -216,30 +216,30 @@ export class ImapService {
     if (!account) {
       return [`<p>❌ No se encontró la cuenta ${email}</p>`];
     }
-  
+
     let imap: ImapSimple;
     try {
       imap = await imaps.connect(
         this.getDynamicConfig(account.email, account.password),
       );
       await imap.openBox('INBOX');
-  
+
       const twelveHoursAgo = Date.now() - 12 * 60 * 60 * 1000;
       const messages = await imap.search(['ALL'], {
         bodies: [''],
         markSeen: false,
       });
-  
+
       const result: string[] = [];
       const platformLower = platform.toLowerCase();
-  
+
       for (const msg of messages) {
         const parts = msg.parts as any[];
         const bodyPart = parts.find((part) => part.which === '');
         if (!bodyPart) continue;
-  
+
         const parsed: ParsedMail = await simpleParser(bodyPart.body as Source);
-  
+
         // 👇 EXTRAEMOS el destinatario del correo
         let toAddress = '';
         try {
@@ -249,20 +249,20 @@ export class ImapService {
             toAddress = (parsed.to as any).value?.[0]?.address?.toLowerCase();
           }
         } catch (e) {}
-  
+
         const fromText = parsed.from?.text?.toLowerCase() || '';
         const fromAddress =
           parsed.from?.value?.[0]?.address?.toLowerCase() || '';
         const receivedDate = parsed.date?.getTime() || 0;
-  
+
         const posibles = REMITENTES_POR_PLATAFORMA[platformLower] || [];
-  
+
         const isAliasMatch = toAddress.includes(email.toLowerCase());
         const isRemitenteMatch = posibles.some(
           (remitente) =>
             fromText.includes(remitente) || fromAddress.includes(remitente),
         );
-  
+
         // 👇 LOG para debug
         console.log('📩 Revisando correo IMAP registrado:');
         console.log('→ To:', toAddress);
@@ -272,7 +272,7 @@ export class ImapService {
         console.log('→ Coincide remitente?', isRemitenteMatch);
         console.log('→ ¿Está dentro de 12h?', receivedDate > twelveHoursAgo);
         console.log('----------------------------------');
-  
+
         if (isAliasMatch && isRemitenteMatch && receivedDate > twelveHoursAgo) {
           result.push(
             parsed.html ||
@@ -282,7 +282,7 @@ export class ImapService {
           );
         }
       }
-  
+
       return result.length
         ? result
         : [`<p>❌ No hay correos recientes de ${platform} para ${email}</p>`];
@@ -300,4 +300,4 @@ export class ImapService {
       }
     }
   }
-  
+}
