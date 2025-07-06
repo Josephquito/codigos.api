@@ -94,6 +94,15 @@ export class ImapService {
 
       const result: string[] = [];
 
+      // Diccionario de remitentes conocidos por plataforma
+      const knownSenders: Record<string, string[]> = {
+        disney: ['disney.com', 'plus.disney.com'],
+        netflix: ['netflix.com'],
+        prime: ['amazon.com', 'primevideo.com'],
+      };
+
+      const senders = knownSenders[platform.toLowerCase()] || [];
+
       for (const msg of messages) {
         const parts = msg.parts as any[];
         const bodyPart = parts.find((part) => part.which === '');
@@ -108,12 +117,15 @@ export class ImapService {
           toAddress = parsed.to.value?.[0]?.address?.toLowerCase();
         }
 
-        const from = parsed.from?.text?.toLowerCase() || '';
+        const fromAddress =
+          parsed.from?.value?.[0]?.address?.toLowerCase() || '';
         const receivedDate = parsed.date?.getTime() || 0;
+
+        const isValidPlatform = senders.some((s) => fromAddress.includes(s));
 
         if (
           toAddress === alias.toLowerCase() &&
-          from.includes(platform.toLowerCase()) &&
+          isValidPlatform &&
           receivedDate > twelveHoursAgo
         ) {
           result.push(
