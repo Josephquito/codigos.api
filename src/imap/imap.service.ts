@@ -126,7 +126,14 @@ export class ImapService {
           (remitente) =>
             fromText.includes(remitente) || fromAddress.includes(remitente),
         );
-
+        console.log('📬 Revisando correo:');
+        console.log('→ To:', toAddress);
+        console.log('→ From:', fromAddress);
+        console.log('→ Date:', parsed.date);
+        console.log('→ Coincide alias?', isAliasMatch);
+        console.log('→ Coincide remitente Disney?', isRemitenteMatch);
+        console.log('→ ¿Está dentro de 12h?', receivedDate > twelveHoursAgo);
+        console.log('----------------------------------');
         if (isAliasMatch && isRemitenteMatch && receivedDate > twelveHoursAgo) {
           result.push(
             parsed.html ||
@@ -244,6 +251,12 @@ export class ImapService {
           (remitente) =>
             fromText.includes(remitente) || fromAddress.includes(remitente),
         );
+        console.log('📩 Revisando correo IMAP registrado:');
+        console.log('→ From:', fromAddress);
+        console.log('→ Date:', parsed.date);
+        console.log('→ Coincide remitente Disney?', isRemitenteMatch);
+        console.log('→ ¿Está dentro de 12h?', receivedDate > twelveHoursAgo);
+        console.log('----------------------------------');
 
         if (isRemitenteMatch && receivedDate > twelveHoursAgo) {
           result.push(

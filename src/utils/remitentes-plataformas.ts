@@ -6,6 +6,7 @@ export const REMITENTES_POR_PLATAFORMA: Record<string, string[]> = {
     'disneyplus.com',
     'disney+',
     'disneyplus',
+    'disneyplus@trx.mail2.disneyplus.com',
   ],
   prime: [
     'account-update@primevideo.com',
