@@ -45,7 +45,19 @@ export class AuthService {
   }
 
   async saveToken(email: string, token: Credentials): Promise<void> {
-    await this.tokenRepo.save({ email, token }); // ✅ campo correcto
+    const existing = await this.tokenRepo.findOne({ where: { email } });
+
+    const newToken: Credentials = {
+      access_token: token.access_token,
+      expiry_date: token.expiry_date,
+      refresh_token:
+        token.refresh_token ?? (existing?.token as Credentials)?.refresh_token,
+
+      scope: token.scope,
+      token_type: token.token_type,
+    };
+
+    await this.tokenRepo.save({ email, token: newToken });
   }
 
   async loadToken(email: string) {
@@ -53,7 +65,8 @@ export class AuthService {
     if (!entry) return null;
 
     const client = this.getOAuthClient();
-    client.setCredentials(entry.token as Credentials); // ✅ CORRECTO: entry.token, no entry.tokens
+    client.setCredentials(entry.token);
+
     return client;
   }
 }

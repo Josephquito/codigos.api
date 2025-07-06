@@ -1,5 +1,6 @@
 // src/auth/gmail-token.entity.ts
 import { Entity, Column, PrimaryGeneratedColumn } from 'typeorm';
+import { Credentials } from 'google-auth-library';
 
 @Entity('gmail_tokens')
 export class GmailToken {
@@ -9,8 +10,9 @@ export class GmailToken {
   @Column({ unique: true })
   email!: string;
 
+  // ✅ Aquí especificamos el tipo Credentials en lugar de 'object'
   @Column({ type: 'jsonb' })
-  token!: object;
+  token!: Credentials;
 
   @Column({ type: 'timestamp', default: () => 'CURRENT_TIMESTAMP' })
   created_at!: Date;

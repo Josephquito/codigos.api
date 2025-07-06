@@ -12,7 +12,19 @@ export class GmailTokenService {
   ) {}
 
   async saveToken(email: string, token: Credentials): Promise<void> {
-    await this.repo.save({ email, token });
+    const existing = await this.repo.findOne({ where: { email } });
+
+    const newToken: Credentials = {
+      access_token: token.access_token,
+      expiry_date: token.expiry_date,
+      refresh_token:
+        token.refresh_token ?? (existing?.token as Credentials)?.refresh_token,
+
+      scope: token.scope,
+      token_type: token.token_type,
+    };
+
+    await this.repo.save({ email, token: newToken });
   }
 
   async loadToken(email: string): Promise<Credentials | null> {
