@@ -93,15 +93,7 @@ export class ImapService {
       });
 
       const result: string[] = [];
-
-      // Diccionario de remitentes conocidos por plataforma
-      const knownSenders: Record<string, string[]> = {
-        disney: ['disney.com', 'plus.disney.com'],
-        netflix: ['netflix.com'],
-        prime: ['amazon.com', 'primevideo.com'],
-      };
-
-      const senders = knownSenders[platform.toLowerCase()] || [];
+      const platformLower = platform.toLowerCase();
 
       for (const msg of messages) {
         const parts = msg.parts as any[];
@@ -110,24 +102,28 @@ export class ImapService {
 
         const parsed: ParsedMail = await simpleParser(bodyPart.body as Source);
 
-        let toAddress: string | undefined;
-        if (Array.isArray(parsed.to)) {
-          toAddress = (parsed.to[0] as any)?.address?.toLowerCase();
-        } else if (parsed.to && 'value' in parsed.to) {
-          toAddress = parsed.to.value?.[0]?.address?.toLowerCase();
-        }
+        // Extraer destinatario (To)
+        let toAddress = '';
+        try {
+          if (Array.isArray(parsed.to)) {
+            toAddress = (parsed.to[0] as any)?.address?.toLowerCase();
+          } else if ('value' in parsed.to!) {
+            toAddress = (parsed.to as any).value?.[0]?.address?.toLowerCase();
+          }
+        } catch (e) {}
 
+        // Extraer remitente
+        const fromText = parsed.from?.text?.toLowerCase() || '';
         const fromAddress =
           parsed.from?.value?.[0]?.address?.toLowerCase() || '';
         const receivedDate = parsed.date?.getTime() || 0;
 
-        const isValidPlatform = senders.some((s) => fromAddress.includes(s));
+        const isAliasMatch = toAddress.includes(alias.toLowerCase());
+        const isPlatformMatch =
+          fromText.includes(platformLower) ||
+          fromAddress.includes(platformLower);
 
-        if (
-          toAddress === alias.toLowerCase() &&
-          isValidPlatform &&
-          receivedDate > twelveHoursAgo
-        ) {
+        if (isAliasMatch && isPlatformMatch && receivedDate > twelveHoursAgo) {
           result.push(
             parsed.html ||
               parsed.textAsHtml ||
@@ -139,7 +135,7 @@ export class ImapService {
 
       return result.length
         ? result
-        : [`<p>No hay correos recientes de ${platform} para ${alias}</p>`];
+        : [`<p>❌ No hay correos recientes de ${platform} para ${alias}</p>`];
     } catch (error) {
       console.error('❌ Error filtrando correos:', error);
       return ['<p>Error al filtrar correos</p>'];

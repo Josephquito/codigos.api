@@ -55,12 +55,14 @@ export class GmailService {
         }
       } catch (e) {}
 
-      const from = parsed.from?.text?.toLowerCase() || '';
+      const fromText = parsed.from?.text?.toLowerCase() || '';
+      const fromAddress = parsed.from?.value?.[0]?.address?.toLowerCase() || '';
+      const platformLower = platform.toLowerCase();
       const date = parsed.date?.getTime() || 0;
-
       if (
-        toAddress === alias.toLowerCase() &&
-        from.includes(platform.toLowerCase()) &&
+        toAddress.includes(alias.toLowerCase()) &&
+        (fromText.includes(platformLower) ||
+          fromAddress.includes(platformLower)) &&
         date > twelveHoursAgo
       ) {
         results.push(
