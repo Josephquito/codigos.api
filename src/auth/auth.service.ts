@@ -32,6 +32,7 @@ export class AuthService {
     const client = this.getOAuthClient();
     return client.generateAuthUrl({
       access_type: 'offline',
+      prompt: 'consent',
       scope: this.SCOPES,
       state: email,
     });
@@ -67,6 +68,25 @@ export class AuthService {
     const client = this.getOAuthClient();
     client.setCredentials(entry.token);
 
-    return client;
+    try {
+      // Forzar renovación si es necesario
+      const newAccessToken = await client.getAccessToken();
+
+      // Verifica si se generó uno nuevo
+      if (
+        newAccessToken?.token &&
+        newAccessToken.token !== entry.token['access_token']
+      ) {
+        // Guardar el nuevo token
+        const newToken = client.credentials;
+        await this.tokenRepo.update({ email }, { token: newToken });
+        console.log(`🔁 Token renovado para ${email}`);
+      }
+
+      return client;
+    } catch (error) {
+      console.error(`❌ Error renovando token para ${email}:`, error);
+      return null;
+    }
   }
 }
