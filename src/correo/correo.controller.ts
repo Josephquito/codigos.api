@@ -1,4 +1,4 @@
-import { Controller, Get, Param } from '@nestjs/common';
+import { Controller, Get, Param, Query } from '@nestjs/common';
 import { CorreoService } from './correo.service';
 
 @Controller('correo')
@@ -9,7 +9,8 @@ export class CorreoController {
   async getCorreoUnificado(
     @Param('email') email: string,
     @Param('platform') platform: string,
+    @Query('clave') clave: string,
   ): Promise<string[]> {
-    return this.correoService.getCorreoUnificado(email, platform);
+    return this.correoService.getCorreoUnificado(email, platform, clave);
   }
 }

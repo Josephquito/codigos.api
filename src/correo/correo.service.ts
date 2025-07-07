@@ -11,14 +11,22 @@ export class CorreoService {
     private readonly gmailService: GmailService,
   ) {}
 
-  async getCorreoUnificado(email: string, platform: string): Promise<string[]> {
+  async getCorreoUnificado(
+    email: string,
+    platform: string,
+    clave: string,
+  ): Promise<string[]> {
     const isGmail = email.toLowerCase().includes('@gmail.com');
     const isCatchAll = email.toLowerCase().endsWith('@jotavix.com');
     const isRegisteredImap = await this.imapAccountService.getByEmail(email);
 
     if (isGmail) {
       // 1. Cuenta de Gmail autenticada
-      return this.gmailService.getEmailsForAliasFromPlatform(email, platform);
+      return this.gmailService.getEmailsForAliasFromPlatform(
+        email,
+        platform,
+        clave,
+      );
     }
 
     if (isRegisteredImap) {
@@ -26,12 +34,17 @@ export class CorreoService {
       return this.imapService.getEmailsFromRegisteredAccountByPlatform(
         email,
         platform,
+        clave,
       );
     }
 
     if (isCatchAll) {
       // 3. Cuenta IMAP global tipo catch-all
-      return this.imapService.getEmailsForAliasFromPlatform(email, platform);
+      return this.imapService.getEmailsForAliasFromPlatform(
+        email,
+        platform,
+        clave,
+      );
     }
 
     return [`<p>❌ No se reconoce el tipo de correo: ${email}</p>`];
