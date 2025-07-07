@@ -1,19 +1,19 @@
 import { Injectable } from '@nestjs/common';
 import { google } from 'googleapis';
 import { simpleParser, ParsedMail } from 'mailparser';
-import { AuthService } from '../gmail-auth/gmail-auth.service';
+import { GmailAuthService } from '../gmail-auth/gmail-auth.service';
 import { Buffer } from 'buffer';
 import { REMITENTES_POR_PLATAFORMA } from '../utils/remitentes-plataformas';
 
 @Injectable()
 export class GmailService {
-  constructor(private readonly authService: AuthService) {}
+  constructor(private readonly gmailAuthService: GmailAuthService) {}
 
   async getEmailsForAliasFromPlatform(
     alias: string,
     platform: string,
   ): Promise<string[]> {
-    const auth = await this.authService.loadToken(alias);
+    const auth = await this.gmailAuthService.loadToken(alias);
     if (!auth) {
       return [`<p>❌ No se encontró token para ${alias}</p>`];
     }
@@ -84,6 +84,6 @@ export class GmailService {
   }
 
   getAuthUrl(email: string): string {
-    return this.authService.generateAuthUrl(email);
+    return this.gmailAuthService.generateAuthUrl(email);
   }
 }
