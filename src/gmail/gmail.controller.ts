@@ -1,13 +1,13 @@
 //gmail/gmail.controller.ts
 import { Controller, Get, Param, Query, Res } from '@nestjs/common';
 import { GmailService } from './gmail.service';
-import { AuthService } from '../gmail-auth/gmail-auth.service';
+import { GmailAuthService } from '../gmail-auth/gmail-auth.service';
 import { Response } from 'express';
 
 @Controller('gmail')
 export class GmailController {
   constructor(
-    private readonly authService: AuthService,
+    private readonly gmailAuthService: GmailAuthService,
     private readonly gmailService: GmailService,
   ) {}
 
@@ -23,7 +23,7 @@ export class GmailController {
     @Query('state') email: string,
     @Res() res: Response,
   ) {
-    await this.authService.getTokenFromCode(code, email);
+    await this.gmailAuthService.getTokenFromCode(code, email);
     return res.send(`✅ Cuenta autorizada: ${email}`);
   }
 
