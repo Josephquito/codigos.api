@@ -30,7 +30,7 @@ console.log('DB_PASS', process.env.DB_PASS, typeof process.env.DB_PASS);
       },
       autoLoadEntities: true,
       entities: [GmailToken],
-      synchronize: true, // desactiva esto en producción
+      synchronize: false, // desactiva esto en producción
     }),
     TypeOrmModule.forFeature([GmailToken]),
     GmailModule,
