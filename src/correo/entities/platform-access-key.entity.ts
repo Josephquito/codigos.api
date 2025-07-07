@@ -5,7 +5,7 @@ export class PlatformAccessKey {
   @PrimaryGeneratedColumn()
   id!: number;
 
-  @Column()
+  @Column({ nullable: false })
   emailAlias!: string;
 
   @Column()
