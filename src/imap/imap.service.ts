@@ -4,10 +4,14 @@ import { simpleParser, ParsedMail, Source } from 'mailparser';
 import { ImapSimple, Message } from 'imap-simple';
 import { ImapAccountService } from '../imap-account/imap-account.service';
 import { REMITENTES_POR_PLATAFORMA } from '../utils/remitentes-plataformas';
+import { PlataformaClaveService } from '../auth/plataforma-clave.service';
 
 @Injectable()
 export class ImapService {
-  constructor(private readonly imapAccountService: ImapAccountService) {}
+  constructor(
+    private readonly imapAccountService: ImapAccountService,
+    private readonly plataformaClaveService: PlataformaClaveService,
+  ) {}
 
   private readonly config: imaps.ImapSimpleOptions = {
     imap: {
@@ -38,50 +42,19 @@ export class ImapService {
     };
   }
 
-  async getLastEmailHtml(): Promise<string> {
-    let imap: ImapSimple;
-    try {
-      imap = await imaps.connect(this.config);
-      await imap.openBox('INBOX');
-
-      const messages = await imap.search(['ALL'], {
-        bodies: [''],
-        markSeen: false,
-      });
-
-      if (!messages.length) return '<p>No hay mensajes</p>';
-
-      const latest = messages[messages.length - 1];
-      const parts = latest.parts as any[];
-      const bodyPart = parts.find((part) => part.which === '');
-      if (!bodyPart) return '<p>Correo vacío</p>';
-
-      const parsed: ParsedMail = await simpleParser(bodyPart.body as Source);
-      return (
-        parsed.html ||
-        parsed.textAsHtml ||
-        parsed.text ||
-        '<p>Correo sin contenido</p>'
-      );
-    } catch (error) {
-      console.error('❌ Error leyendo correo:', error);
-      return '<p>Error al leer el correo</p>';
-    } finally {
-      if (imap) {
-        try {
-          await imap.closeBox(true);
-          imap.end();
-        } catch (closeErr) {
-          console.error('Error cerrando IMAP:', closeErr);
-        }
-      }
-    }
-  }
-
   async getEmailsForAliasFromPlatform(
     alias: string,
     platform: string,
+    clave: string,
   ): Promise<string[]> {
+    const claveValida = await this.plataformaClaveService.validar(
+      alias,
+      platform,
+      clave,
+    );
+    if (!claveValida) {
+      return [`<p>❌ Clave incorrecta para ${platform}</p>`];
+    }
     let imap: ImapSimple;
     try {
       imap = await imaps.connect(this.config);
@@ -160,56 +133,19 @@ export class ImapService {
     }
   }
 
-  async getLastEmailFromRegisteredAccount(email: string): Promise<string> {
-    const account = await this.imapAccountService.getByEmail(email);
-    if (!account) {
-      return `<p>❌ No se encontró la cuenta ${email}</p>`;
-    }
-
-    let imap: ImapSimple;
-    try {
-      imap = await imaps.connect(
-        this.getDynamicConfig(account.email, account.password),
-      );
-      await imap.openBox('INBOX');
-
-      const messages = await imap.search(['ALL'], {
-        bodies: [''],
-        markSeen: false,
-      });
-
-      if (!messages.length) return '<p>No hay mensajes</p>';
-
-      const latest = messages[messages.length - 1];
-      const parts = latest.parts as any[];
-      const bodyPart = parts.find((part) => part.which === '');
-      if (!bodyPart) return '<p>Correo vacío</p>';
-
-      const parsed: ParsedMail = await simpleParser(bodyPart.body as Source);
-      return (
-        parsed.html ||
-        parsed.textAsHtml ||
-        parsed.text ||
-        '<p>Correo sin contenido</p>'
-      );
-    } catch (err) {
-      console.error('❌ Error leyendo correo IMAP:', err);
-      return '<p>Error al leer el correo</p>';
-    } finally {
-      if (imap) {
-        try {
-          await imap.closeBox(true);
-          imap.end();
-        } catch (closeErr) {
-          console.error('Error cerrando IMAP:', closeErr);
-        }
-      }
-    }
-  }
   async getEmailsFromRegisteredAccountByPlatform(
     email: string,
     platform: string,
+    clave: string,
   ): Promise<string[]> {
+    const claveValida = await this.plataformaClaveService.validar(
+      email,
+      platform,
+      clave,
+    );
+    if (!claveValida) {
+      return [`<p>❌ Clave incorrecta para ${platform}</p>`];
+    }
     const account = await this.imapAccountService.getByEmail(email);
     if (!account) {
       return [`<p>❌ No se encontró la cuenta ${email}</p>`];
@@ -248,14 +184,6 @@ export class ImapService {
           (remitente) =>
             fromText.includes(remitente) || fromAddress.includes(remitente),
         );
-
-        // DEBUG opcional
-        console.log('📩 DEBUG IMAP registrado:');
-        console.log('→ From:', parsed.from);
-        console.log('→ Date:', parsed.date);
-        console.log('→ Coincide remitente:', isRemitenteMatch);
-        console.log('→ ¿Dentro de 12h?', receivedDate > twelveHoursAgo);
-        console.log('----------------------------------');
 
         if (isRemitenteMatch && receivedDate > twelveHoursAgo) {
           result.push({

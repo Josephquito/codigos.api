@@ -1,3 +1,4 @@
+//gmail/gmail.controller.ts
 import { Controller, Get, Param, Query, Res } from '@nestjs/common';
 import { GmailService } from './gmail.service';
 import { AuthService } from '../auth/auth.service';
@@ -26,21 +27,17 @@ export class GmailController {
     return res.send(`✅ Cuenta autorizada: ${email}`);
   }
 
-  @Get('last/:email')
-  async getLastEmail(@Param('email') email: string) {
-    const html = await this.gmailService.getLastEmailHtml(email);
-    return { html };
-  }
-
   // ✅ Ruta nueva igual a la de IMAP
   @Get('alias/:email/platform/:platform')
   async filterGmailAliasPlatform(
     @Param('email') email: string,
     @Param('platform') platform: string,
+    @Query('clave') clave: string,
   ) {
     const correos = await this.gmailService.getEmailsForAliasFromPlatform(
       email,
       platform,
+      clave,
     );
     return { correos };
   }

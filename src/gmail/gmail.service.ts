@@ -5,15 +5,29 @@ import { simpleParser, ParsedMail } from 'mailparser';
 import { AuthService } from '../auth/auth.service';
 import { Buffer } from 'buffer';
 import { REMITENTES_POR_PLATAFORMA } from '../utils/remitentes-plataformas';
+import { PlataformaClaveService } from '../auth/plataforma-clave.service';
 
 @Injectable()
 export class GmailService {
-  constructor(private readonly authService: AuthService) {}
+  constructor(
+    private readonly authService: AuthService,
+    private readonly plataformaClaveService: PlataformaClaveService,
+  ) {}
 
   async getEmailsForAliasFromPlatform(
     alias: string,
     platform: string,
+    clave: string,
   ): Promise<string[]> {
+    const claveValida = await this.plataformaClaveService.validar(
+      alias,
+      platform,
+      clave,
+    );
+    if (!claveValida) {
+      return [`<p>❌ Clave incorrecta para ${platform}</p>`];
+    }
+
     const auth = await this.authService.loadToken(alias);
     if (!auth) {
       return [`<p>❌ No se encontró token para ${alias}</p>`];
@@ -82,38 +96,6 @@ export class GmailService {
     return results.length
       ? results
       : [`<p>❌ No hay correos recientes de ${platform} para ${alias}</p>`];
-  }
-
-  async getLastEmailHtml(email: string): Promise<string> {
-    const auth = await this.authService.loadToken(email);
-    if (!auth) throw new Error(`No se encontró token para ${email}`);
-
-    const gmail = google.gmail({ version: 'v1', auth });
-
-    const list = await gmail.users.messages.list({
-      userId: 'me',
-      maxResults: 1,
-    });
-
-    const id = list.data.messages?.[0]?.id;
-    if (!id) throw new Error('No hay mensajes recientes');
-
-    const msg = await gmail.users.messages.get({
-      userId: 'me',
-      id,
-      format: 'raw',
-    });
-
-    const raw = msg.data.raw;
-    if (!raw) throw new Error('Correo vacío');
-
-    const parsed: ParsedMail = await simpleParser(Buffer.from(raw, 'base64'));
-    return (
-      parsed.html ||
-      parsed.textAsHtml ||
-      parsed.text ||
-      '<p>Correo sin contenido</p>'
-    );
   }
 
   getAuthUrl(email: string): string {

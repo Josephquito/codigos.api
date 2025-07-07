@@ -21,5 +21,5 @@ export const REMITENTES_POR_PLATAFORMA: Record<string, string[]> = {
     'netflix.com',
     'netflix',
   ],
-  crunchyroll: [''],
+  crunchyroll: ['hello@info.crunchyroll.com', 'crunchyroll.com', 'crunchyroll'],
 };
