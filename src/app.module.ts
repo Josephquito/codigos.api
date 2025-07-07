@@ -10,7 +10,9 @@ import { GmailToken } from './gmail/entities/gmail-token.entity';
 import { GmailTokenService } from './gmail/gmail-token.service';
 import { ImapAccountModule } from './imap-account/imap-account.module';
 import { CorreoModule } from './correo/correo.module';
+import { CuentasModule } from './cuentas/cuentas.module';
 import * as dotenv from 'dotenv';
+import { PlatformAccessKey } from './correo/entities/platform-access-key.entity';
 dotenv.config();
 console.log('DB_PASS', process.env.DB_PASS, typeof process.env.DB_PASS);
 @Module({
@@ -29,7 +31,7 @@ console.log('DB_PASS', process.env.DB_PASS, typeof process.env.DB_PASS);
         },
       },
       autoLoadEntities: true,
-      entities: [GmailToken],
+      entities: [GmailToken, PlatformAccessKey],
       synchronize: false, // desactiva esto en producción
     }),
     TypeOrmModule.forFeature([GmailToken]),
@@ -38,6 +40,7 @@ console.log('DB_PASS', process.env.DB_PASS, typeof process.env.DB_PASS);
     ImapModule,
     ImapAccountModule,
     CorreoModule,
+    CuentasModule,
   ],
   controllers: [AppController],
   providers: [AppService, GmailTokenService],
