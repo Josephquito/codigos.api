@@ -5,12 +5,12 @@ export class PlatformAccessKey {
   @PrimaryGeneratedColumn()
   id!: number;
 
-  @Column({ nullable: false })
+  @Column({ name: 'email_alias', nullable: false })
   emailAlias!: string;
 
-  @Column({ nullable: false })
+  @Column({ name: 'plataforma', nullable: false })
   plataforma!: string;
 
-  @Column({ nullable: false })
+  @Column({ name: 'clave', nullable: false })
   clave!: string;
 }
