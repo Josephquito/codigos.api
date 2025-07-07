@@ -12,7 +12,7 @@ interface OAuthCredentials {
 }
 
 @Injectable()
-export class AuthService {
+export class GmailAuthService {
   private SCOPES = ['https://www.googleapis.com/auth/gmail.readonly'];
 
   constructor(

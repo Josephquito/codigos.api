@@ -1,7 +1,7 @@
 //gmail/gmail.controller.ts
 import { Controller, Get, Param, Query, Res } from '@nestjs/common';
 import { GmailService } from './gmail.service';
-import { AuthService } from '../auth/auth.service';
+import { AuthService } from '../gmail-auth/gmail-auth.service';
 import { Response } from 'express';
 
 @Controller('gmail')

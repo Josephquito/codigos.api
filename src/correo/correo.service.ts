@@ -2,7 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { ImapAccountService } from '../imap-account/imap-account.service';
 import { ImapService } from '../imap/imap.service';
 import { GmailService } from '../gmail/gmail.service';
-import { PlataformaClaveService } from '../auth/plataforma-clave.service';
+import { PlataformaClaveService } from '../plataformas/plataforma-clave.service';
 
 @Injectable()
 export class CorreoService {

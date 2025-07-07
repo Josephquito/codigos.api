@@ -3,7 +3,7 @@ import { Module } from '@nestjs/common';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { GmailModule } from './gmail/gmail.module';
-import { AuthModule } from './auth/auth.module';
+import { GmailAuthModule } from './gmail-auth/gmail-auth.module';
 import { ImapModule } from './imap/imap.module';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { GmailToken } from './gmail/entities/gmail-token.entity';
@@ -36,11 +36,11 @@ console.log('DB_PASS', process.env.DB_PASS, typeof process.env.DB_PASS);
     }),
     TypeOrmModule.forFeature([GmailToken]),
     GmailModule,
-    AuthModule,
     ImapModule,
     ImapAccountModule,
     CorreoModule,
     CuentasModule,
+    GmailAuthModule,
   ],
   controllers: [AppController],
   providers: [AppService, GmailTokenService],

@@ -2,10 +2,10 @@ import { Module } from '@nestjs/common';
 import { ImapService } from './imap.service';
 import { ImapController } from './imap.controller';
 import { ImapAccountModule } from '../imap-account/imap-account.module'; // 👈 Asegúrate de importar esto
-import { AuthModule } from 'src/auth/auth.module';
+import { GmailAuthModule } from 'src/gmail-auth/gmail-auth.module';
 
 @Module({
-  imports: [ImapAccountModule, AuthModule], // 👈 Importarlo aquí
+  imports: [ImapAccountModule, GmailAuthModule], // 👈 Importarlo aquí
   providers: [ImapService],
   controllers: [ImapController],
 })

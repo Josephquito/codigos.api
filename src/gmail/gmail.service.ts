@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { google } from 'googleapis';
 import { simpleParser, ParsedMail } from 'mailparser';
-import { AuthService } from '../auth/auth.service';
+import { AuthService } from '../gmail-auth/gmail-auth.service';
 import { Buffer } from 'buffer';
 import { REMITENTES_POR_PLATAFORMA } from '../utils/remitentes-plataformas';
 
