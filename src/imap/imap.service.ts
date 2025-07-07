@@ -4,14 +4,10 @@ import { simpleParser, ParsedMail, Source } from 'mailparser';
 import { ImapSimple, Message } from 'imap-simple';
 import { ImapAccountService } from '../imap-account/imap-account.service';
 import { REMITENTES_POR_PLATAFORMA } from '../utils/remitentes-plataformas';
-import { PlataformaClaveService } from '../auth/plataforma-clave.service';
 
 @Injectable()
 export class ImapService {
-  constructor(
-    private readonly imapAccountService: ImapAccountService,
-    private readonly plataformaClaveService: PlataformaClaveService,
-  ) {}
+  constructor(private readonly imapAccountService: ImapAccountService) {}
 
   private readonly config: imaps.ImapSimpleOptions = {
     imap: {
@@ -32,7 +28,7 @@ export class ImapService {
     return {
       imap: {
         user: email,
-        password: password,
+        password,
         host: process.env.IMAP_HOST,
         port: Number(process.env.IMAP_PORT) || 993,
         tls: true,
@@ -45,16 +41,7 @@ export class ImapService {
   async getEmailsForAliasFromPlatform(
     alias: string,
     platform: string,
-    clave: string,
   ): Promise<string[]> {
-    const claveValida = await this.plataformaClaveService.validar(
-      alias,
-      platform,
-      clave,
-    );
-    if (!claveValida) {
-      return [`<p>❌ Clave incorrecta para ${platform}</p>`];
-    }
     let imap: ImapSimple;
     try {
       imap = await imaps.connect(this.config);
@@ -89,13 +76,11 @@ export class ImapService {
         const fromAddress =
           parsed.from?.value?.[0]?.address?.toLowerCase() || '';
         const receivedDate = parsed.date?.getTime() || 0;
-
         const posibles = REMITENTES_POR_PLATAFORMA[platformLower] || [];
 
         const isAliasMatch = toAddress.includes(alias.toLowerCase());
         const isRemitenteMatch = posibles.some(
-          (remitente) =>
-            fromText.includes(remitente) || fromAddress.includes(remitente),
+          (rem) => fromText.includes(rem) || fromAddress.includes(rem),
         );
 
         if (isAliasMatch && isRemitenteMatch && receivedDate > twelveHoursAgo) {
@@ -136,16 +121,7 @@ export class ImapService {
   async getEmailsFromRegisteredAccountByPlatform(
     email: string,
     platform: string,
-    clave: string,
   ): Promise<string[]> {
-    const claveValida = await this.plataformaClaveService.validar(
-      email,
-      platform,
-      clave,
-    );
-    if (!claveValida) {
-      return [`<p>❌ Clave incorrecta para ${platform}</p>`];
-    }
     const account = await this.imapAccountService.getByEmail(email);
     if (!account) {
       return [`<p>❌ No se encontró la cuenta ${email}</p>`];
@@ -181,8 +157,7 @@ export class ImapService {
         const receivedDate = parsed.date?.getTime() || 0;
 
         const isRemitenteMatch = posibles.some(
-          (remitente) =>
-            fromText.includes(remitente) || fromAddress.includes(remitente),
+          (rem) => fromText.includes(rem) || fromAddress.includes(rem),
         );
 
         if (isRemitenteMatch && receivedDate > twelveHoursAgo) {

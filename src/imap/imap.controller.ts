@@ -1,4 +1,4 @@
-import { Controller, Get, Param, Query } from '@nestjs/common';
+import { Controller, Get, Param } from '@nestjs/common';
 import { ImapService } from './imap.service';
 
 @Controller('imap')
@@ -9,25 +9,18 @@ export class ImapController {
   async getByAliasAndPlatform(
     @Param('email') email: string,
     @Param('platform') platform: string,
-    @Query('clave') clave: string,
   ): Promise<string[]> {
-    return this.imapService.getEmailsForAliasFromPlatform(
-      email,
-      platform,
-      clave,
-    );
+    return this.imapService.getEmailsForAliasFromPlatform(email, platform);
   }
 
   @Get('registered/:email/platform/:platform')
   async getRegisteredByPlatform(
     @Param('email') email: string,
     @Param('platform') platform: string,
-    @Query('clave') clave: string,
   ): Promise<string[]> {
     return this.imapService.getEmailsFromRegisteredAccountByPlatform(
       email,
       platform,
-      clave,
     );
   }
 }

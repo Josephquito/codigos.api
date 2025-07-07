@@ -15,7 +15,11 @@ export class PlataformaClaveService {
     plataforma: string,
     clave: string,
   ): Promise<boolean> {
-    const acceso = await this.repo.findOneBy({ emailAlias: email, plataforma });
-    return acceso?.clave === clave;
+    const acceso = await this.repo.findOneBy({
+      emailAlias: email.toLowerCase(),
+      plataforma: plataforma.toLowerCase(),
+    });
+
+    return !!acceso && acceso.clave === clave;
   }
 }

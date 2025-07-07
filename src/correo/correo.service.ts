@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { ImapAccountService } from '../imap-account/imap-account.service';
 import { ImapService } from '../imap/imap.service';
 import { GmailService } from '../gmail/gmail.service';
+import { PlataformaClaveService } from '../auth/plataforma-clave.service';
 
 @Injectable()
 export class CorreoService {
@@ -9,6 +10,7 @@ export class CorreoService {
     private readonly imapAccountService: ImapAccountService,
     private readonly imapService: ImapService,
     private readonly gmailService: GmailService,
+    private readonly plataformaClaveService: PlataformaClaveService,
   ) {}
 
   async getCorreoUnificado(
@@ -16,35 +18,33 @@ export class CorreoService {
     platform: string,
     clave: string,
   ): Promise<string[]> {
+    // Validar clave antes de continuar
+    const claveValida = await this.plataformaClaveService.validar(
+      email,
+      platform,
+      clave,
+    );
+    if (!claveValida) {
+      return [`<p>❌ Clave incorrecta para la plataforma ${platform}</p>`];
+    }
+
     const isGmail = email.toLowerCase().includes('@gmail.com');
     const isCatchAll = email.toLowerCase().endsWith('@jotavix.com');
     const isRegisteredImap = await this.imapAccountService.getByEmail(email);
 
     if (isGmail) {
-      // 1. Cuenta de Gmail autenticada
-      return this.gmailService.getEmailsForAliasFromPlatform(
-        email,
-        platform,
-        clave,
-      );
+      return this.gmailService.getEmailsForAliasFromPlatform(email, platform);
     }
 
     if (isRegisteredImap) {
-      // 2. Cuenta IMAP registrada individualmente (en DB)
       return this.imapService.getEmailsFromRegisteredAccountByPlatform(
         email,
         platform,
-        clave,
       );
     }
 
     if (isCatchAll) {
-      // 3. Cuenta IMAP global tipo catch-all
-      return this.imapService.getEmailsForAliasFromPlatform(
-        email,
-        platform,
-        clave,
-      );
+      return this.imapService.getEmailsForAliasFromPlatform(email, platform);
     }
 
     return [`<p>❌ No se reconoce el tipo de correo: ${email}</p>`];

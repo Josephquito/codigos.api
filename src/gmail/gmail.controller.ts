@@ -32,12 +32,10 @@ export class GmailController {
   async filterGmailAliasPlatform(
     @Param('email') email: string,
     @Param('platform') platform: string,
-    @Query('clave') clave: string,
   ) {
     const correos = await this.gmailService.getEmailsForAliasFromPlatform(
       email,
       platform,
-      clave,
     );
     return { correos };
   }

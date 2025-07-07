@@ -1,33 +1,18 @@
-// src/gmail/gmail.service.ts
 import { Injectable } from '@nestjs/common';
 import { google } from 'googleapis';
 import { simpleParser, ParsedMail } from 'mailparser';
 import { AuthService } from '../auth/auth.service';
 import { Buffer } from 'buffer';
 import { REMITENTES_POR_PLATAFORMA } from '../utils/remitentes-plataformas';
-import { PlataformaClaveService } from '../auth/plataforma-clave.service';
 
 @Injectable()
 export class GmailService {
-  constructor(
-    private readonly authService: AuthService,
-    private readonly plataformaClaveService: PlataformaClaveService,
-  ) {}
+  constructor(private readonly authService: AuthService) {}
 
   async getEmailsForAliasFromPlatform(
     alias: string,
     platform: string,
-    clave: string,
   ): Promise<string[]> {
-    const claveValida = await this.plataformaClaveService.validar(
-      alias,
-      platform,
-      clave,
-    );
-    if (!claveValida) {
-      return [`<p>❌ Clave incorrecta para ${platform}</p>`];
-    }
-
     const auth = await this.authService.loadToken(alias);
     if (!auth) {
       return [`<p>❌ No se encontró token para ${alias}</p>`];
