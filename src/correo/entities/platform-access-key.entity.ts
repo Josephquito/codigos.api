@@ -8,9 +8,9 @@ export class PlatformAccessKey {
   @Column({ nullable: false })
   emailAlias!: string;
 
-  @Column()
+  @Column({ nullable: false })
   plataforma!: string;
 
-  @Column()
+  @Column({ nullable: false })
   clave!: string;
 }
