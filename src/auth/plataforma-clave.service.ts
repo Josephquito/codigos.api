@@ -15,10 +15,11 @@ export class PlataformaClaveService {
     plataforma: string,
     clave: string,
   ): Promise<boolean> {
-    const acceso = await this.repo.findOneBy({
-      emailAlias: email.toLowerCase(),
-      plataforma: plataforma.toLowerCase(),
-    });
+    const acceso = await this.repo
+      .createQueryBuilder('key')
+      .where('LOWER(key.emailAlias) = LOWER(:email)', { email })
+      .andWhere('LOWER(key.plataforma) = LOWER(:plataforma)', { plataforma })
+      .getOne();
 
     return !!acceso && acceso.clave === clave;
   }
