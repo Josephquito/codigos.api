@@ -10,6 +10,12 @@ export class GmailController {
     private readonly gmailAuthService: GmailAuthService,
     private readonly gmailService: GmailService,
   ) {}
+  @Get('check/:email')
+  async checkIfRegistered(@Param('email') email: string) {
+    const exists = await this.gmailAuthService.isEmailRegistered(email);
+    return { exists };
+  }
+
   @Get('login/:email')
   async login(@Param('email') email: string, @Res() res: Response) {
     const alreadyExists = await this.gmailAuthService.isEmailRegistered(email);
