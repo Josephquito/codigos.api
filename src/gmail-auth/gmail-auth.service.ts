@@ -20,6 +20,10 @@ export class GmailAuthService {
     private readonly tokenRepo: Repository<GmailToken>,
   ) {}
 
+  async isEmailRegistered(email: string): Promise<boolean> {
+    return await this.tokenRepo.exist({ where: { email } });
+  }
+
   getOAuthClient() {
     const raw = process.env.GOOGLE_CREDENTIALS;
     if (!raw) throw new Error('GOOGLE_CREDENTIALS no está definido');

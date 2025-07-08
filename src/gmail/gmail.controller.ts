@@ -10,11 +10,16 @@ export class GmailController {
     private readonly gmailAuthService: GmailAuthService,
     private readonly gmailService: GmailService,
   ) {}
-
   @Get('login/:email')
-  login(@Param('email') email: string, @Res() res: Response) {
-    const url = this.gmailService.getAuthUrl(email);
-    res.redirect(url);
+  async login(@Param('email') email: string, @Res() res: Response) {
+    const alreadyExists = await this.gmailAuthService.isEmailRegistered(email);
+    if (alreadyExists) {
+      // Puedes devolver un mensaje claro o redirigir a un frontend con error
+      return res.status(400).send(`❌ El correo ${email} ya está registrado`);
+    }
+
+    const url = this.gmailAuthService.generateAuthUrl(email);
+    return res.redirect(url);
   }
 
   @Get('auth/google/callback')
