@@ -8,7 +8,7 @@ import { GmailToken } from '../gmail/entities/gmail-token.entity';
 interface OAuthCredentials {
   client_id: string;
   client_secret: string;
-  redirect_uris: string[];
+  redirect_uris: string[]; //xd
 }
 
 @Injectable()
