@@ -11,12 +11,15 @@ import { GmailTokenService } from './gmail/gmail-token.service';
 import { ImapAccountModule } from './imap-account/imap-account.module';
 import { CorreoModule } from './correo/correo.module';
 import { CuentasModule } from './cuentas/cuentas.module';
-import * as dotenv from 'dotenv';
 import { PlatformAccessKey } from './correo/entities/platform-access-key.entity';
-dotenv.config();
-console.log('DB_PASS', process.env.DB_PASS, typeof process.env.DB_PASS);
+import { AuthModule } from './auth/auth.module';
+import { UsersModule } from './users/users.module';
+import { ConfigModule } from '@nestjs/config';
+import { User } from './users/entities/user.entity';
+
 @Module({
   imports: [
+    ConfigModule.forRoot({ isGlobal: true }),
     TypeOrmModule.forRoot({
       type: 'postgres',
       host: process.env.DB_HOST,
@@ -31,7 +34,7 @@ console.log('DB_PASS', process.env.DB_PASS, typeof process.env.DB_PASS);
         },
       },
       autoLoadEntities: true,
-      entities: [GmailToken, PlatformAccessKey],
+      entities: [GmailToken, PlatformAccessKey, User],
       synchronize: false, // desactiva esto en producción
     }),
     TypeOrmModule.forFeature([GmailToken]),
@@ -41,6 +44,8 @@ console.log('DB_PASS', process.env.DB_PASS, typeof process.env.DB_PASS);
     CorreoModule,
     CuentasModule,
     GmailAuthModule,
+    AuthModule,
+    UsersModule,
   ],
   controllers: [AppController],
   providers: [AppService, GmailTokenService],

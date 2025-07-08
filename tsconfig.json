@@ -21,6 +21,7 @@
     "esModuleInterop": true,
     "types": ["node"],
     "strict": true,
-    "noUncheckedIndexedAccess": false
+    "noUncheckedIndexedAccess": false,
+    "strictPropertyInitialization": false
   }
 }
