@@ -12,27 +12,52 @@ export class CorreoService {
     private readonly gmailService: GmailService,
     private readonly plataformaClaveService: PlataformaClaveService,
   ) {}
-
   async getCorreoUnificado(
     email: string,
     platform: string,
     clave: string,
   ): Promise<string[]> {
-    // Validar clave antes de continuar
+    const lowerEmail = email.toLowerCase();
+    const isGmail = lowerEmail.includes('@gmail.com');
+    const isCatchAll = lowerEmail.endsWith('@jotavix.com');
+
+    const isRegisteredImap = await this.imapAccountService.getByEmail(email);
+    const isRegisteredGmail = await this.gmailService.tokenExists(email);
+
+    const esCorreoValido =
+      isCatchAll || isRegisteredImap || (isGmail && isRegisteredGmail);
+
+    if (!esCorreoValido) {
+      return [
+        `
+        <div class="text-center text-red-600 space-y-2">
+          <p>❌ Este correo no está registrado.</p>
+          <p>Solicita el código haciendo clic en el botón:</p>
+          <a
+            href="https://wa.me/message/FAVGMBVXNAFUM1"
+            target="_blank"
+            rel="noopener"
+            class="inline-block mt-2 px-4 py-2 bg-green-500 text-white rounded hover:bg-green-600"
+          >
+            Ir a WhatsApp
+          </a>
+        </div>
+        `,
+      ];
+    }
+
     const claveValida = await this.plataformaClaveService.validar(
       email,
       platform,
       clave,
     );
     if (!claveValida) {
-      return [`<p>❌ Clave incorrecta para la plataforma ${platform}</p>`];
+      return [
+        `<p class="text-red-600">❌ Clave incorrecta para la plataforma ${platform}</p>`,
+      ];
     }
 
-    const isGmail = email.toLowerCase().includes('@gmail.com');
-    const isCatchAll = email.toLowerCase().endsWith('@jotavix.com');
-    const isRegisteredImap = await this.imapAccountService.getByEmail(email);
-
-    if (isGmail) {
+    if (isGmail && isRegisteredGmail) {
       return this.gmailService.getEmailsForAliasFromPlatform(email, platform);
     }
 
@@ -47,6 +72,8 @@ export class CorreoService {
       return this.imapService.getEmailsForAliasFromPlatform(email, platform);
     }
 
-    return [`<p>❌ No se reconoce el tipo de correo: ${email}</p>`];
+    return [
+      `<p class="text-red-600">❌ No se reconoce el tipo de correo: ${email}</p>`,
+    ];
   }
 }

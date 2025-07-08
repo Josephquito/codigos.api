@@ -5,9 +5,17 @@ import { GmailAuthService } from '../gmail-auth/gmail-auth.service';
 import { Buffer } from 'buffer';
 import { REMITENTES_POR_PLATAFORMA } from '../utils/remitentes-plataformas';
 
+import { InjectRepository } from '@nestjs/typeorm';
+import { Repository } from 'typeorm';
+import { GmailToken } from './entities/gmail-token.entity';
+
 @Injectable()
 export class GmailService {
-  constructor(private readonly gmailAuthService: GmailAuthService) {}
+  constructor(
+    private readonly gmailAuthService: GmailAuthService,
+    @InjectRepository(GmailToken)
+    private readonly tokenRepo: Repository<GmailToken>,
+  ) {}
 
   async getEmailsForAliasFromPlatform(
     alias: string,
@@ -85,5 +93,9 @@ export class GmailService {
 
   getAuthUrl(email: string): string {
     return this.gmailAuthService.generateAuthUrl(email);
+  }
+
+  async tokenExists(email: string): Promise<boolean> {
+    return await this.tokenRepo.exist({ where: { email } });
   }
 }
