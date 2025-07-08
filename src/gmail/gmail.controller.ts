@@ -1,12 +1,5 @@
 //gmail/gmail.controller.ts
-import {
-  Controller,
-  Get,
-  Param,
-  Query,
-  Res,
-  BadRequestException,
-} from '@nestjs/common';
+import { Controller, Get, Param, Query, Res } from '@nestjs/common';
 import { GmailService } from './gmail.service';
 import { GmailAuthService } from '../gmail-auth/gmail-auth.service';
 import { Response } from 'express';
@@ -24,14 +17,15 @@ export class GmailController {
   }
 
   @Get('login/:email')
-  async login(@Param('email') email: string) {
+  async login(@Param('email') email: string, @Res() res: Response) {
     const alreadyExists = await this.gmailAuthService.isEmailRegistered(email);
     if (alreadyExists) {
-      throw new BadRequestException(`❌ El correo ${email} ya está registrado`);
+      // Puedes devolver un mensaje claro o redirigir a un frontend con error
+      return res.status(400).send(`❌ El correo ${email} ya está registrado`);
     }
 
     const url = this.gmailAuthService.generateAuthUrl(email);
-    return { redirect: url };
+    return res.redirect(url);
   }
 
   @Get('auth/google/callback')
