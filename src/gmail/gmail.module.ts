@@ -8,6 +8,6 @@ import { GmailToken } from './entities/gmail-token.entity';
 @Module({
   imports: [TypeOrmModule.forFeature([GmailToken])],
   providers: [GmailService, GmailAuthService],
-  exports: [GmailService, GmailAuthService], // 👈 exportamos para que otros módulos lo usen
+  exports: [GmailService, GmailAuthService, TypeOrmModule], // 👈 exportamos para que otros módulos lo usen
 })
 export class GmailModule {}
