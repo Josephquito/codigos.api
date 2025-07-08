@@ -31,13 +31,13 @@ export class CorreoService {
       return [
         `
         <div class="text-center text-red-600 space-y-2">
-          <p>❌ Este correo no está registrado.</p>
+          <p class="text-lg">❌ Este correo no está registrado.</p>
           <p>Solicita el código haciendo clic en el botón:</p>
           <a
             href="https://wa.me/message/FAVGMBVXNAFUM1"
             target="_blank"
             rel="noopener"
-            class="inline-block mt-2 px-4 py-2 bg-green-500 text-white rounded hover:bg-green-600"
+            class="inline-block mt-2 px-5 py-2 rounded-md text-white font-semibold bg-[#25D366] hover:bg-[#1ebe5d] transition"
           >
             Ir a WhatsApp
           </a>
