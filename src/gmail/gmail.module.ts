@@ -1,11 +1,13 @@
+// gmail.module.ts
 import { Module } from '@nestjs/common';
+import { TypeOrmModule } from '@nestjs/typeorm';
+import { GmailToken } from './entities/gmail-token.entity'; // Asegúrate de que esta es la entidad correcta
 import { GmailService } from './gmail.service';
-import { GmailController } from './gmail.controller';
-import { GmailAuthModule } from '../gmail-auth/gmail-auth.module'; // 👈 importar el módulo
+import { GmailAuthService } from '../gmail-auth/gmail-auth.service';
 
 @Module({
-  imports: [GmailAuthModule], // 👈 esto es lo que le dice a Nest cómo resolver AuthService
-  controllers: [GmailController],
-  providers: [GmailService],
+  imports: [TypeOrmModule.forFeature([GmailToken])],
+  providers: [GmailService, GmailAuthService],
+  exports: [GmailService],
 })
 export class GmailModule {}
