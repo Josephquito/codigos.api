@@ -16,6 +16,7 @@ import { AuthModule } from './auth/auth.module';
 import { UsersModule } from './users/users.module';
 import { ConfigModule } from '@nestjs/config';
 import { User } from './users/entities/user.entity';
+import { GmailController } from './gmail/gmail.controller';
 
 @Module({
   imports: [
@@ -46,6 +47,7 @@ import { User } from './users/entities/user.entity';
     GmailAuthModule,
     AuthModule,
     UsersModule,
+    GmailController,
   ],
   controllers: [AppController],
   providers: [AppService, GmailTokenService],
