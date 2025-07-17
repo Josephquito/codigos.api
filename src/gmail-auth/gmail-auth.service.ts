@@ -57,12 +57,18 @@ export class GmailAuthService {
       expiry_date: token.expiry_date,
       refresh_token:
         token.refresh_token ?? (existing?.token as Credentials)?.refresh_token,
-
       scope: token.scope,
       token_type: token.token_type,
     };
 
-    await this.tokenRepo.save({ email, token: newToken });
+    if (existing) {
+      // 🔁 Si ya existe → actualiza
+      await this.tokenRepo.update({ email }, { token: newToken });
+    } else {
+      // ➕ Si no existe → inserta
+      const tokenEntity = this.tokenRepo.create({ email, token: newToken });
+      await this.tokenRepo.save(tokenEntity);
+    }
   }
 
   async loadToken(email: string) {
