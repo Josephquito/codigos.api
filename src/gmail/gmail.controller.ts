@@ -10,6 +10,7 @@ export class GmailController {
     private readonly gmailAuthService: GmailAuthService,
     private readonly gmailService: GmailService,
   ) {}
+
   @Get('check/:email')
   async checkIfRegistered(@Param('email') email: string) {
     const exists = await this.gmailAuthService.isEmailRegistered(email);
@@ -20,10 +21,16 @@ export class GmailController {
   async login(@Param('email') email: string, @Res() res: Response) {
     const alreadyExists = await this.gmailAuthService.isEmailRegistered(email);
     if (alreadyExists) {
-      // Puedes devolver un mensaje claro o redirigir a un frontend con error
       return res.status(400).send(`❌ El correo ${email} ya está registrado`);
     }
 
+    const url = this.gmailAuthService.generateAuthUrl(email);
+    return res.redirect(url);
+  }
+
+  // ✅ NUEVO ENDPOINT PARA RENOVAR SIN VALIDACIÓN
+  @Get('renew/:email')
+  renovarToken(@Param('email') email: string, @Res() res: Response) {
     const url = this.gmailAuthService.generateAuthUrl(email);
     return res.redirect(url);
   }
@@ -38,7 +45,6 @@ export class GmailController {
     return res.send(`✅ Cuenta autorizada: ${email}`);
   }
 
-  // ✅ Ruta nueva igual a la de IMAP
   @Get('alias/:email/platform/:platform')
   async filterGmailAliasPlatform(
     @Param('email') email: string,

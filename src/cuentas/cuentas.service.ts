@@ -86,4 +86,11 @@ export class CuentasService {
     entry.clave = dto.clave;
     return this.repo.save(entry);
   }
+  async remove(emailAlias: string, plataforma: string): Promise<boolean> {
+    const result = await this.repo.delete({
+      emailAlias: emailAlias.toLowerCase(),
+      plataforma: plataforma.toLowerCase(),
+    });
+    return (result.affected ?? 0) > 0;
+  }
 }

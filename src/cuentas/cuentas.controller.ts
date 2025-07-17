@@ -7,6 +7,7 @@ import { AuthGuard } from '../auth/guard/auth.guard';
 import { RolesGuard } from '../auth/guard/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { UserRole } from '../users/user-role.enum';
+import { Delete } from '@nestjs/common';
 @UseGuards(AuthGuard, RolesGuard)
 @Roles(UserRole.ADMIN)
 @Controller('cuentas')
@@ -35,5 +36,13 @@ export class CuentasController {
     @Body() dto: UpdateCuentaDto,
   ) {
     return this.cuentasService.update(emailAlias, plataforma, dto);
+  }
+
+  @Delete(':emailAlias/:plataforma')
+  remove(
+    @Param('emailAlias') emailAlias: string,
+    @Param('plataforma') plataforma: string,
+  ) {
+    return this.cuentasService.remove(emailAlias, plataforma);
   }
 }
