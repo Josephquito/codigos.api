@@ -93,4 +93,10 @@ export class CuentasService {
     });
     return (result.affected ?? 0) > 0;
   }
+  async eliminarCuentaCompleta(emailAlias: string): Promise<boolean> {
+    const result = await this.repo.delete({
+      emailAlias: emailAlias.toLowerCase(),
+    });
+    return (result.affected ?? 0) > 0;
+  }
 }

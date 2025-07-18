@@ -45,4 +45,9 @@ export class CuentasController {
   ) {
     return this.cuentasService.remove(emailAlias, plataforma);
   }
+
+  @Delete(':emailAlias')
+  eliminarCuentaCompleta(@Param('emailAlias') emailAlias: string) {
+    return this.cuentasService.eliminarCuentaCompleta(emailAlias);
+  }
 }
