@@ -6,7 +6,13 @@ dotenv.config();
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
   app.enableCors({
-    origin: ['http://localhost:4200', 'https://jotavix.com'],
+    origin: [
+      'http://localhost:4200',
+      'http://jotavix.com',
+      'https://jotavix.com',
+      'http://www.jotavix.com',
+      'https://www.jotavix.com', // 👈 agrega esta
+    ],
     credentials: true,
   });
   await app.listen(process.env.PORT || 3000);
