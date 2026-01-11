@@ -1,12 +1,11 @@
-import { Transform } from 'class-transformer';
+//auth/dto/login.dto.ts
 import { IsEmail, IsString, MinLength } from 'class-validator';
 
 export class LoginDto {
   @IsEmail()
-  email!: string;
+  email: string;
 
-  @Transform(({ value }: { value: string }) => value.trim())
   @IsString()
-  @MinLength(6)
-  password!: string;
+  @MinLength(8)
+  password: string;
 }

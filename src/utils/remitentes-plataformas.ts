@@ -1,3 +1,4 @@
+// src/utils/remitentes-plataformas.ts
 export const REMITENTES_POR_PLATAFORMA: Record<string, string[]> = {
   chatgpt: ['noreply@tm.openai.com', 'chatgpt', 'openai.com', 'OpenAI'],
   disney: [

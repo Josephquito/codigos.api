@@ -1,102 +1,137 @@
+// cuentas/cuentas.service.ts
 import { Injectable } from '@nestjs/common';
-import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
-import { PlatformAccessKey } from 'src/correo/entities/platform-access-key.entity';
+import { PrismaService } from '../prisma/prisma.service';
 import { CreateCuentaDto } from './dto/create-cuenta.dto';
 import { UpdateCuentaDto } from './dto/update-cuenta.dto';
 
+type CuentaRow = {
+  correo: string;
+  disney: string;
+  netflix: string;
+  prime: string;
+  chatgpt: string;
+  crunchyroll: string;
+};
+
+function baseCuenta(correo: string): CuentaRow {
+  return {
+    correo,
+    disney: 'Sin asignar',
+    netflix: 'Sin asignar',
+    prime: 'Sin asignar',
+    chatgpt: 'Sin asignar',
+    crunchyroll: 'Sin asignar',
+  };
+}
+
 @Injectable()
 export class CuentasService {
-  constructor(
-    @InjectRepository(PlatformAccessKey)
-    private readonly repo: Repository<PlatformAccessKey>,
-  ) {}
-  async findAll() {
-    const registros = await this.repo.find();
+  constructor(private readonly prisma: PrismaService) {}
 
-    const cuentasMap = new Map<string, any>();
+  async findAll(userId: number) {
+    const registros = await this.prisma.platformAccessKey.findMany({
+      where: { userId, active: true },
+      select: { emailAlias: true, plataforma: true, clave: true },
+      orderBy: [{ emailAlias: 'asc' }],
+    });
+
+    const cuentasMap = new Map<string, CuentaRow>();
 
     for (const reg of registros) {
       const correo = reg.emailAlias.toLowerCase();
       const plataforma = reg.plataforma.toLowerCase();
-      const clave = reg.clave;
 
       if (!cuentasMap.has(correo)) {
-        cuentasMap.set(correo, {
-          correo,
-          disney: 'Sin asignar',
-          netflix: 'Sin asignar',
-          prime: 'Sin asignar',
-          chatgpt: 'Sin asignar',
-          crunchyroll: 'Sin asignar',
-        });
+        cuentasMap.set(correo, baseCuenta(correo));
       }
 
-      const cuenta = cuentasMap.get(correo);
-      cuenta[plataforma] = clave;
+      const cuenta = cuentasMap.get(correo)!;
+
+      // Solo setea si la plataforma coincide con una propiedad
+      if (plataforma in cuenta) {
+        (cuenta as any)[plataforma] = reg.clave;
+      }
     }
 
     return Array.from(cuentasMap.values());
   }
 
-  async findByEmail(email: string) {
-    const registros = await this.repo.find({
-      where: { emailAlias: email.toLowerCase() },
+  async findByEmail(userId: number, email: string) {
+    const emailAlias = email.toLowerCase();
+
+    const registros = await this.prisma.platformAccessKey.findMany({
+      where: { userId, emailAlias, active: true },
+      select: { plataforma: true, clave: true },
     });
 
     if (registros.length === 0) return [];
 
-    const cuenta = {
-      correo: email.toLowerCase(),
-      disney: 'Sin asignar',
-      netflix: 'Sin asignar',
-      prime: 'Sin asignar',
-      chatgpt: 'Sin asignar',
-      crunchyroll: 'Sin asignar',
-    };
+    const cuenta = baseCuenta(emailAlias);
 
     for (const reg of registros) {
       const plataforma = reg.plataforma.toLowerCase();
-      cuenta[plataforma] = reg.clave;
+      if (plataforma in cuenta) {
+        (cuenta as any)[plataforma] = reg.clave;
+      }
     }
 
     return [cuenta];
   }
 
-  async create(dto: CreateCuentaDto): Promise<PlatformAccessKey> {
-    const nueva = this.repo.create({
-      emailAlias: dto.emailAlias.toLowerCase(),
-      plataforma: dto.plataforma.toLowerCase(),
-      clave: dto.clave,
+  async create(userId: number, dto: CreateCuentaDto) {
+    return this.prisma.platformAccessKey.create({
+      data: {
+        userId,
+        emailAlias: dto.emailAlias.toLowerCase(),
+        plataforma: dto.plataforma.toLowerCase(),
+        clave: dto.clave,
+        active: true,
+      },
     });
-    return this.repo.save(nueva);
   }
+
   async update(
+    userId: number,
     emailAlias: string,
     plataforma: string,
     dto: UpdateCuentaDto,
-  ): Promise<PlatformAccessKey | null> {
-    const entry = await this.repo.findOneBy({
-      emailAlias: emailAlias.toLowerCase(),
-      plataforma: plataforma.toLowerCase(),
+  ) {
+    return this.prisma.platformAccessKey.update({
+      where: {
+        userId_plataforma_emailAlias: {
+          userId,
+          plataforma: plataforma.toLowerCase(),
+          emailAlias: emailAlias.toLowerCase(),
+        },
+      },
+      data: {
+        clave: dto.clave,
+      },
+    });
+  }
+
+  async remove(userId: number, emailAlias: string, plataforma: string) {
+    await this.prisma.platformAccessKey.delete({
+      where: {
+        userId_plataforma_emailAlias: {
+          userId,
+          plataforma: plataforma.toLowerCase(),
+          emailAlias: emailAlias.toLowerCase(),
+        },
+      },
     });
 
-    if (!entry) return null;
+    return true;
+  }
 
-    entry.clave = dto.clave;
-    return this.repo.save(entry);
-  }
-  async remove(emailAlias: string, plataforma: string): Promise<boolean> {
-    const result = await this.repo.delete({
-      emailAlias: emailAlias.toLowerCase(),
-      plataforma: plataforma.toLowerCase(),
+  async eliminarCuentaCompleta(userId: number, emailAlias: string) {
+    const res = await this.prisma.platformAccessKey.deleteMany({
+      where: {
+        userId,
+        emailAlias: emailAlias.toLowerCase(),
+      },
     });
-    return (result.affected ?? 0) > 0;
-  }
-  async eliminarCuentaCompleta(emailAlias: string): Promise<boolean> {
-    const result = await this.repo.delete({
-      emailAlias: emailAlias.toLowerCase(),
-    });
-    return (result.affected ?? 0) > 0;
+
+    return res.count > 0;
   }
 }

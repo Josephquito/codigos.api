@@ -1,3 +1,9 @@
+// cuentas/dto/update-cuenta.dto.ts
+import { IsNotEmpty, IsString, MaxLength } from 'class-validator';
+
 export class UpdateCuentaDto {
-  clave!: string;
+  @IsString()
+  @IsNotEmpty()
+  @MaxLength(255)
+  clave: string;
 }

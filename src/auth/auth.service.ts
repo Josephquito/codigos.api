@@ -1,58 +1,52 @@
-import {
-  BadRequestException,
-  Injectable,
-  UnauthorizedException,
-} from '@nestjs/common';
-import { UsersService } from '../users/users.service';
-import { RegisterDto } from './dto/register.dto';
-
-import * as bcrypt from 'bcryptjs';
-import { LoginDto } from './dto/login.dto';
+/* eslint-disable @typescript-eslint/no-unsafe-member-access */
+/* eslint-disable @typescript-eslint/no-unsafe-call */
+/* eslint-disable @typescript-eslint/no-unnecessary-type-assertion */
+/* eslint-disable @typescript-eslint/no-unsafe-assignment */
+// auth/auth.service.ts
+import { Injectable, UnauthorizedException } from '@nestjs/common';
+import { PrismaService } from '../prisma/prisma.service';
+import * as bcrypt from 'bcrypt';
 import { JwtService } from '@nestjs/jwt';
-import { UserRole } from '../users/user-role.enum'; // ajusta la ruta si es diferente
+import { UserRole } from '../generated/prisma/client';
 
 @Injectable()
 export class AuthService {
   constructor(
-    private readonly usersService: UsersService,
-    private readonly jwtService: JwtService,
+    private readonly prisma: PrismaService,
+    private readonly jwt: JwtService,
   ) {}
-  async register({ name, email, password, role }: RegisterDto) {
-    const user = await this.usersService.findOneByEmail(email);
-    if (user) {
-      throw new BadRequestException('User already exists');
-    }
-    return this.usersService.create({
-      name,
-      email,
-      password: await bcrypt.hash(password, 10),
-      role: role ?? UserRole.USER,
+
+  async validateUser(email: string, password: string) {
+    const user = await this.prisma.user.findUnique({
+      where: { email },
     });
+
+    if (!user) throw new UnauthorizedException('Credenciales inválidas');
+    if (!user.isActive)
+      throw new UnauthorizedException('Credenciales inválidas');
+
+    const ok = await bcrypt.compare(password, user.password);
+    if (!ok) throw new UnauthorizedException('Credenciales inválidas');
+
+    return {
+      id: user.id,
+      email: user.email,
+      name: user.name,
+      role: user.role as UserRole,
+    };
   }
 
-  async login({ email, password }: LoginDto) {
-    const user = await this.usersService.findOneByEmail(email);
-    if (!user) {
-      throw new UnauthorizedException('Email no es correcto');
-    }
-
-    const isPasswordValid = await bcrypt.compare(password, user.password);
-    if (!isPasswordValid) {
-      throw new UnauthorizedException('Contraseña no es correcta');
-    }
+  async login(email: string, password: string) {
+    const user = await this.validateUser(email, password);
 
     const payload = {
       sub: user.id,
       email: user.email,
-      role: user.role, // 👈 importante incluir esto
+      role: user.role,
     };
 
-    const token = await this.jwtService.signAsync(payload);
-
     return {
-      token,
-      email: user.email,
-      role: user.role, // 👈 ahora sí se devuelve
+      access_token: await this.jwt.signAsync(payload),
     };
   }
 }

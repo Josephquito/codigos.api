@@ -1,15 +1,15 @@
+// correo/correo.module.ts
 import { Module } from '@nestjs/common';
-import { CorreoService } from './correo.service';
 import { CorreoController } from './correo.controller';
-import { ImapService } from '../imap/imap.service';
-import { GmailService } from '../gmail/gmail.service';
+import { CorreoService } from './correo.service';
+
+import { PlataformasModule } from '../plataformas/plataformas.module';
 import { GmailModule } from '../gmail/gmail.module';
-import { GmailAuthModule } from 'src/gmail-auth/gmail-auth.module';
-import { ImapAccountModule } from 'src/imap-account/imap-account.module';
+import { ImapModule } from '../imap/imap.module';
 
 @Module({
-  imports: [ImapAccountModule, GmailAuthModule, GmailModule],
+  imports: [PlataformasModule, GmailModule, ImapModule],
   controllers: [CorreoController],
-  providers: [CorreoService, ImapService, GmailService],
+  providers: [CorreoService],
 })
 export class CorreoModule {}

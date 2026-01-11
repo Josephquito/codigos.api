@@ -1,53 +1,113 @@
-import { Controller, Get, Query, Post, Body, Put, Param } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Delete,
+  Get,
+  Param,
+  Patch,
+  Post,
+  Query,
+  Req,
+  UseGuards,
+} from '@nestjs/common';
+
 import { CuentasService } from './cuentas.service';
 import { CreateCuentaDto } from './dto/create-cuenta.dto';
 import { UpdateCuentaDto } from './dto/update-cuenta.dto';
-import { UseGuards } from '@nestjs/common';
-import { AuthGuard } from '../auth/guard/auth.guard';
-import { RolesGuard } from '../auth/guard/roles.guard';
-import { Roles } from '../auth/decorators/roles.decorator';
-import { UserRole } from '../users/user-role.enum';
-import { Delete } from '@nestjs/common';
-@UseGuards(AuthGuard, RolesGuard)
-@Roles(UserRole.ADMIN)
+
+import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { UserRole } from '../generated/prisma/client';
+
 @Controller('cuentas')
+@UseGuards(JwtAuthGuard)
 export class CuentasController {
   constructor(private readonly cuentasService: CuentasService) {}
 
-  @Get()
-  findAll() {
-    return this.cuentasService.findAll();
+  // =========================
+  // Keys (USER)
+  // =========================
+
+  /**
+   * Listar mis claves (USER)
+   */
+  @Get('keys')
+  async listMyKeys(@Req() req: any) {
+    if (req.user.role !== UserRole.USER) {
+      throw new Error('Solo USER puede gestionar claves');
+    }
+    return this.cuentasService.findAll(req.user.id);
   }
 
-  @Get('buscar')
-  findByEmail(@Query('email') email: string) {
-    return this.cuentasService.findByEmail(email);
+  /**
+   * Buscar mis claves por email alias (USER)
+   * /cuentas/keys/search?email=correo@dominio.com
+   */
+  @Get('keys/search')
+  async findMyKeysByEmail(@Req() req: any, @Query('email') email: string) {
+    if (req.user.role !== UserRole.USER) {
+      throw new Error('Solo USER puede gestionar claves');
+    }
+    return this.cuentasService.findByEmail(req.user.id, email);
   }
 
-  @Post()
-  create(@Body() dto: CreateCuentaDto) {
-    return this.cuentasService.create(dto);
+  /**
+   * Crear clave (USER)
+   * Body: { emailAlias, plataforma, clave }
+   */
+  @Post('keys')
+  async createKey(@Req() req: any, @Body() dto: CreateCuentaDto) {
+    if (req.user.role !== UserRole.USER) {
+      throw new Error('Solo USER puede gestionar claves');
+    }
+    return this.cuentasService.create(req.user.id, dto);
   }
 
-  @Put(':emailAlias/:plataforma')
-  update(
+  /**
+   * Actualizar clave (USER)
+   * PATCH /cuentas/keys/:emailAlias/:plataforma
+   * Body: { clave }
+   */
+  @Patch('keys/:emailAlias/:plataforma')
+  async updateKey(
+    @Req() req: any,
     @Param('emailAlias') emailAlias: string,
     @Param('plataforma') plataforma: string,
     @Body() dto: UpdateCuentaDto,
   ) {
-    return this.cuentasService.update(emailAlias, plataforma, dto);
+    if (req.user.role !== UserRole.USER) {
+      throw new Error('Solo USER puede gestionar claves');
+    }
+    return this.cuentasService.update(req.user.id, emailAlias, plataforma, dto);
   }
 
-  @Delete(':emailAlias/:plataforma')
-  remove(
+  /**
+   * Eliminar clave puntual (USER)
+   * DELETE /cuentas/keys/:emailAlias/:plataforma
+   */
+  @Delete('keys/:emailAlias/:plataforma')
+  async deleteKey(
+    @Req() req: any,
     @Param('emailAlias') emailAlias: string,
     @Param('plataforma') plataforma: string,
   ) {
-    return this.cuentasService.remove(emailAlias, plataforma);
+    if (req.user.role !== UserRole.USER) {
+      throw new Error('Solo USER puede gestionar claves');
+    }
+    return this.cuentasService.remove(req.user.id, emailAlias, plataforma);
   }
 
-  @Delete(':emailAlias')
-  eliminarCuentaCompleta(@Param('emailAlias') emailAlias: string) {
-    return this.cuentasService.eliminarCuentaCompleta(emailAlias);
+  /**
+   * Eliminar todas mis claves de un alias (USER)
+   * DELETE /cuentas/keys/:emailAlias
+   */
+  @Delete('keys/:emailAlias')
+  async deleteAllKeysForAlias(
+    @Req() req: any,
+    @Param('emailAlias') emailAlias: string,
+  ) {
+    if (req.user.role !== UserRole.USER) {
+      throw new Error('Solo USER puede gestionar claves');
+    }
+    return this.cuentasService.eliminarCuentaCompleta(req.user.id, emailAlias);
   }
 }

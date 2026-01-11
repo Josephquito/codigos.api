@@ -1,0 +1,108 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum UserRole {
+  USER
+  ADMIN
+}
+
+model User {
+  id        Int      @id @default(autoincrement())
+  name      String
+  email     String   @unique // Email de acceso: único global
+  password  String
+  role      UserRole @default(USER)
+
+  isActive  Boolean  @default(true)
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt      @map("updated_at")
+
+  imapAccounts       ImapAccount[]
+  gmailTokens        GmailToken[]
+  platformAccessKeys PlatformAccessKey[]
+
+  @@map("users")
+}
+
+model ImapAccount {
+  id        Int      @id @default(autoincrement())
+  userId    Int      @map("user_id")
+
+  email     String   // Puede repetirse en distintos usuarios
+  password  String
+  active    Boolean  @default(true)
+
+  // ✅ Diferenciación funcional (no técnica): la cuenta se usa como catch-all
+  isCatchAll Boolean @default(false) @map("is_catch_all")
+
+  // ✅ Config IMAP por cuenta (multi-dominio real)
+  imapHost  String   @map("imap_host")
+  imapPort  Int      @default(993) @map("imap_port")
+  useTls    Boolean  @default(true) @map("use_tls")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt      @map("updated_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([userId, isCatchAll]) // útil para buscar catch-alls del usuario
+  @@unique([userId, email])     // Unicidad por usuario
+  @@map("imap_accounts")
+}
+
+model GmailToken {
+  id        Int      @id @default(autoincrement())
+  userId    Int      @map("user_id")
+
+  email     String   // Puede repetirse en distintos usuarios
+  token     Json     @db.JsonB
+  active    Boolean  @default(true)
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt      @map("updated_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@unique([userId, email]) // Unicidad por usuario
+  @@map("gmail_tokens")
+}
+
+model PlatformAccessKey {
+  id         Int      @id @default(autoincrement())
+  userId     Int      @map("user_id")
+
+  emailAlias String   @map("email_alias")
+  plataforma String   @map("plataforma")
+  clave      String   @map("clave")
+  active     Boolean  @default(true)
+
+  createdAt  DateTime @default(now()) @map("created_at")
+  updatedAt  DateTime @updatedAt      @map("updated_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+
+  // Gestión: no se repite dentro del mismo usuario
+  @@unique([userId, plataforma, emailAlias])
+
+  // Público: el triple identifica 1 registro global
+  @@unique([plataforma, emailAlias, clave])
+
+  @@map("platform_access_keys")
+}

@@ -1,12 +1,13 @@
+// cuentas/cuentas.module.ts
 import { Module } from '@nestjs/common';
-import { CuentasService } from './cuentas.service';
+import { PrismaModule } from '../prisma/prisma.module';
 import { CuentasController } from './cuentas.controller';
-import { TypeOrmModule } from '@nestjs/typeorm';
-import { PlatformAccessKey } from 'src/correo/entities/platform-access-key.entity';
+import { CuentasService } from './cuentas.service';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([PlatformAccessKey])],
-  providers: [CuentasService],
+  imports: [PrismaModule],
   controllers: [CuentasController],
+  providers: [CuentasService],
+  exports: [CuentasService],
 })
 export class CuentasModule {}

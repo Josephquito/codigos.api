@@ -1,13 +1,14 @@
-// gmail.module.ts
 import { Module } from '@nestjs/common';
-import { TypeOrmModule } from '@nestjs/typeorm';
 import { GmailService } from './gmail.service';
-import { GmailAuthService } from '../gmail-auth/gmail-auth.service';
-import { GmailToken } from './entities/gmail-token.entity';
+import { GmailAuthService } from './gmail-auth.service';
+import { GmailController } from './gmail.controller';
+import { GmailAuthController } from './gmail-auth.controller';
+import { PrismaModule } from '../prisma/prisma.module';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([GmailToken])],
+  imports: [PrismaModule],
+  controllers: [GmailController, GmailAuthController],
   providers: [GmailService, GmailAuthService],
-  exports: [GmailService, GmailAuthService, TypeOrmModule], // 👈 exportamos para que otros módulos lo usen
+  exports: [GmailService, GmailAuthService],
 })
 export class GmailModule {}
