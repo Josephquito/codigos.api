@@ -12,7 +12,13 @@ export class GmailAuthController {
     @Query('state') state: string,
     @Res() res: Response,
   ) {
+    // 1️⃣ Guardar tokens de Google
     await this.gmailAuthService.getTokenFromCode(code, state);
-    return res.send('✅ Cuenta autorizada correctamente');
+
+    // 2️⃣ Redirigir al frontend
+    const frontUrl = process.env.FRONT_URL || 'http://localhost:4200';
+
+    // Opcional: pasar flags al frontend
+    return res.redirect(`${frontUrl}/gmail-register?connected=1`);
   }
 }

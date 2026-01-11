@@ -85,4 +85,17 @@ export class UsersService {
       },
     });
   }
+
+  async listAllUsers() {
+    return this.prisma.user.findMany({
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        role: true,
+        isActive: true,
+        createdAt: true,
+      },
+    });
+  }
 }

@@ -8,6 +8,8 @@ import {
   Post,
   Req,
   UseGuards,
+  ParseIntPipe,
+  ForbiddenException,
 } from '@nestjs/common';
 import { UsersService } from './users.service';
 import { CreateUserDto } from './dto/create-user.dto';
@@ -34,16 +36,30 @@ export class UsersController {
     return this.usersService.createUser(dto);
   }
 
+  @Get()
+  list(@Req() req: any) {
+    if (req.user.role !== UserRole.ADMIN) {
+      throw new Error('Solo ADMIN puede listar usuarios');
+    }
+    return this.usersService.listAllUsers();
+  }
+
   // 🚫 Activar / desactivar usuario (ADMIN)
   @Patch(':id/active')
   setActive(
-    @Param('id') id: string,
+    @Param('id', ParseIntPipe) id: number,
     @Body() body: { isActive: boolean },
     @Req() req: any,
   ) {
     if (req.user.role !== UserRole.ADMIN) {
-      throw new Error('Solo ADMIN puede modificar usuarios');
+      throw new ForbiddenException('Solo ADMIN puede modificar usuarios');
     }
-    return this.usersService.setActive(Number(id), body.isActive);
+
+    // ✅ Evita auto-desactivación
+    if (req.user.id === id && body.isActive === false) {
+      throw new ForbiddenException('No puedes desactivarte a ti mismo');
+    }
+
+    return this.usersService.setActive(id, body.isActive);
   }
 }

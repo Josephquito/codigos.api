@@ -21,12 +21,14 @@ export class AuthService {
       where: { email },
     });
 
-    if (!user) throw new UnauthorizedException('Credenciales inválidas');
+    if (!user) throw new UnauthorizedException('Usuario no encontrado');
     if (!user.isActive)
-      throw new UnauthorizedException('Credenciales inválidas');
+      throw new UnauthorizedException(
+        'Usuario desactivado, contacta con tu proveedor',
+      );
 
     const ok = await bcrypt.compare(password, user.password);
-    if (!ok) throw new UnauthorizedException('Credenciales inválidas');
+    if (!ok) throw new UnauthorizedException('Contraseña incorrecta');
 
     return {
       id: user.id,

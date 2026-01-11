@@ -1,5 +1,8 @@
-// gmail.service.ts
-import { Injectable } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { google } from 'googleapis';
 import { simpleParser, ParsedMail } from 'mailparser';
 import { Buffer } from 'buffer';
@@ -14,23 +17,71 @@ export class GmailService {
     private readonly prisma: PrismaService,
   ) {}
 
+  private assertGmail(email: string) {
+    if (!/@gmail\.com$/i.test(email)) {
+      throw new BadRequestException('El correo debe ser @gmail.com');
+    }
+  }
+
   async tokenExists(userId: number, email: string): Promise<boolean> {
+    this.assertGmail(email);
+
     const found = await this.prisma.gmailToken.findUnique({
       where: { userId_email: { userId, email } },
       select: { id: true, active: true },
     });
+
     return !!found?.id && !!found.active;
   }
 
+  // ✅ 2) Listar mis cuentas Gmail registradas
+  async listMyAccounts(userId: number) {
+    const rows = await this.prisma.gmailToken.findMany({
+      where: { userId },
+      select: {
+        id: true,
+        email: true,
+        active: true,
+        createdAt: true,
+        updatedAt: true,
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    return rows;
+  }
+
+  // ✅ 4) Eliminar cuenta (solo dueño)
+  async deleteMyAccount(userId: number, email: string) {
+    this.assertGmail(email);
+
+    const row = await this.prisma.gmailToken.findUnique({
+      where: { userId_email: { userId, email } },
+      select: { id: true, token: true },
+    });
+
+    if (!row) throw new NotFoundException('Cuenta no registrada');
+
+    await this.prisma.gmailToken.delete({
+      where: { userId_email: { userId, email } },
+    });
+
+    return { deleted: true, email };
+  }
+
   getAuthUrl(userId: number, email: string): string {
+    this.assertGmail(email);
     return this.gmailAuthService.generateAuthUrl(userId, email);
   }
 
+  // ✅ 5) Lectura por alias/plataforma (tu método, endurecido)
   async getEmailsForAliasFromPlatform(
     userId: number,
     alias: string,
     platform: string,
   ): Promise<string[]> {
+    this.assertGmail(alias);
+
     const auth = await this.gmailAuthService.loadClient(userId, alias);
     if (!auth) return [`<p>❌ No se encontró token activo para ${alias}</p>`];
 
@@ -47,6 +98,7 @@ export class GmailService {
     const messages = Array.isArray(listRes.data.messages)
       ? listRes.data.messages
       : [];
+
     const messageIds = messages
       .map((m) => m.id)
       .filter((id): id is string => typeof id === 'string' && id.length > 0);
@@ -56,6 +108,8 @@ export class GmailService {
     }
 
     const results: string[] = [];
+    const platformLower = platform.toLowerCase();
+    const posibles = REMITENTES_POR_PLATAFORMA[platformLower] || [];
 
     for (const id of messageIds) {
       const res = await gmail.users.messages.get({
@@ -77,9 +131,7 @@ export class GmailService {
 
       const fromText = parsed.from?.text?.toLowerCase() || '';
       const fromAddress = parsed.from?.value?.[0]?.address?.toLowerCase() || '';
-      const platformLower = platform.toLowerCase();
       const date = parsed.date?.getTime() || 0;
-      const posibles = REMITENTES_POR_PLATAFORMA[platformLower] || [];
 
       if (
         toAddress.includes(alias.toLowerCase()) &&

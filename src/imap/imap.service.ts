@@ -5,6 +5,7 @@ import {
   NotFoundException,
   ForbiddenException,
   BadRequestException,
+  HttpException,
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 
@@ -41,8 +42,11 @@ export class ImapService {
   }): imaps.ImapSimpleOptions {
     const { email, password, host, port, useTls } = params;
 
-    // Logs de diagnóstico (no imprimimos la clave)
-    console.log('[IMAP] host=', host, 'port=', port, 'tls=', useTls);
+    const cleanHost = (host || '').trim().toLowerCase();
+    const cleanPort = Number(port) || 993;
+
+    // Logs internos OK (no al user)
+    console.log('[IMAP] host=', cleanHost, 'port=', cleanPort, 'tls=', useTls);
     console.log(
       '[IMAP] user=',
       email,
@@ -54,14 +58,12 @@ export class ImapService {
       imap: {
         user: email,
         password,
-        host,
-        port,
-        tls: useTls,
+        host: cleanHost,
+        port: cleanPort,
+        tls: !!useTls,
         autotls: 'always',
         authTimeout: 15000,
-        tlsOptions: {
-          servername: host,
-        },
+        tlsOptions: cleanHost ? { servername: cleanHost } : undefined,
       },
     };
   }
@@ -247,16 +249,16 @@ export class ImapService {
       where: { userId, email: normalizedEmail },
     });
 
-    if (!account)
-      throw new NotFoundException(
-        `❌ No se encontró la cuenta ${normalizedEmail}`,
-      );
-    if (!account.active)
-      throw new ForbiddenException(
-        `❌ La cuenta ${normalizedEmail} está desactivada`,
-      );
+    if (!account) {
+      throw new ForbiddenException('No tienes acceso a este correo');
+    }
 
-    return account; // incluye password + host/port/tls
+    if (!account.active) {
+      // si prefieres no filtrar, usa el mismo mensaje:
+      throw new ForbiddenException('No tienes acceso a este correo');
+    }
+
+    return account;
   }
 
   /**
@@ -382,7 +384,10 @@ export class ImapService {
 
       const { content } = result.sort((a, b) => b.date - a.date)[0];
       return [content];
-    } catch (error) {
+    } catch (error: any) {
+      // 👇 NO tapes errores controlados (403/400/404/etc)
+      if (error instanceof HttpException) throw error;
+
       console.error(
         '❌ Error filtrando correos (catch-all por dominio):',
         error,
@@ -465,7 +470,10 @@ export class ImapService {
 
       const { content } = result.sort((a, b) => b.date - a.date)[0];
       return [content];
-    } catch (error) {
+    } catch (error: any) {
+      // 👇 ESTE ES EL PUNTO CLAVE PARA QUE SALGA "No tienes acceso..."
+      if (error instanceof HttpException) throw error;
+
       console.error('❌ Error filtrando correos (cuenta del usuario):', error);
       return ['<p>Error al filtrar correos</p>'];
     } finally {

@@ -2,6 +2,7 @@ import {
   Body,
   Controller,
   Delete,
+  ForbiddenException,
   Get,
   Param,
   Patch,
@@ -23,47 +24,47 @@ import { UserRole } from '../generated/prisma/client';
 export class CuentasController {
   constructor(private readonly cuentasService: CuentasService) {}
 
+  private assertUserOrAdmin(role: UserRole) {
+    if (role !== UserRole.USER && role !== UserRole.ADMIN) {
+      throw new ForbiddenException('No autorizado');
+    }
+  }
+
   // =========================
-  // Keys (USER)
+  // Keys (USER + ADMIN)
   // =========================
 
   /**
-   * Listar mis claves (USER)
+   * Listar mis claves (USER + ADMIN)
    */
   @Get('keys')
   async listMyKeys(@Req() req: any) {
-    if (req.user.role !== UserRole.USER) {
-      throw new Error('Solo USER puede gestionar claves');
-    }
+    this.assertUserOrAdmin(req.user.role);
     return this.cuentasService.findAll(req.user.id);
   }
 
   /**
-   * Buscar mis claves por email alias (USER)
+   * Buscar mis claves por email alias (USER + ADMIN)
    * /cuentas/keys/search?email=correo@dominio.com
    */
   @Get('keys/search')
   async findMyKeysByEmail(@Req() req: any, @Query('email') email: string) {
-    if (req.user.role !== UserRole.USER) {
-      throw new Error('Solo USER puede gestionar claves');
-    }
+    this.assertUserOrAdmin(req.user.role);
     return this.cuentasService.findByEmail(req.user.id, email);
   }
 
   /**
-   * Crear clave (USER)
+   * Crear clave (USER + ADMIN)
    * Body: { emailAlias, plataforma, clave }
    */
   @Post('keys')
   async createKey(@Req() req: any, @Body() dto: CreateCuentaDto) {
-    if (req.user.role !== UserRole.USER) {
-      throw new Error('Solo USER puede gestionar claves');
-    }
+    this.assertUserOrAdmin(req.user.role);
     return this.cuentasService.create(req.user.id, dto);
   }
 
   /**
-   * Actualizar clave (USER)
+   * Actualizar clave (USER + ADMIN)
    * PATCH /cuentas/keys/:emailAlias/:plataforma
    * Body: { clave }
    */
@@ -74,14 +75,12 @@ export class CuentasController {
     @Param('plataforma') plataforma: string,
     @Body() dto: UpdateCuentaDto,
   ) {
-    if (req.user.role !== UserRole.USER) {
-      throw new Error('Solo USER puede gestionar claves');
-    }
+    this.assertUserOrAdmin(req.user.role);
     return this.cuentasService.update(req.user.id, emailAlias, plataforma, dto);
   }
 
   /**
-   * Eliminar clave puntual (USER)
+   * Eliminar clave puntual (USER + ADMIN)
    * DELETE /cuentas/keys/:emailAlias/:plataforma
    */
   @Delete('keys/:emailAlias/:plataforma')
@@ -90,14 +89,12 @@ export class CuentasController {
     @Param('emailAlias') emailAlias: string,
     @Param('plataforma') plataforma: string,
   ) {
-    if (req.user.role !== UserRole.USER) {
-      throw new Error('Solo USER puede gestionar claves');
-    }
+    this.assertUserOrAdmin(req.user.role);
     return this.cuentasService.remove(req.user.id, emailAlias, plataforma);
   }
 
   /**
-   * Eliminar todas mis claves de un alias (USER)
+   * Eliminar todas mis claves de un alias (USER + ADMIN)
    * DELETE /cuentas/keys/:emailAlias
    */
   @Delete('keys/:emailAlias')
@@ -105,9 +102,7 @@ export class CuentasController {
     @Req() req: any,
     @Param('emailAlias') emailAlias: string,
   ) {
-    if (req.user.role !== UserRole.USER) {
-      throw new Error('Solo USER puede gestionar claves');
-    }
+    this.assertUserOrAdmin(req.user.role);
     return this.cuentasService.eliminarCuentaCompleta(req.user.id, emailAlias);
   }
 }
