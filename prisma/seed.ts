@@ -2,17 +2,9 @@
 /* eslint-disable @typescript-eslint/no-unsafe-assignment */
 
 import * as bcrypt from 'bcrypt';
-import { Pool } from 'pg';
-import { PrismaPg } from '@prisma/adapter-pg';
 import { PrismaClient, UserRole } from '../src/generated/prisma/client';
 
-const pool = new Pool({
-  connectionString: process.env.DATABASE_URL,
-});
-
-const prisma = new PrismaClient({
-  adapter: new PrismaPg(pool),
-});
+const prisma = new PrismaClient();
 
 async function main() {
   const email = process.env.ADMIN_EMAIL;
@@ -23,19 +15,20 @@ async function main() {
     throw new Error('ADMIN_EMAIL y ADMIN_PASSWORD son obligatorios');
   }
 
-  const existingAdmin = await prisma.user.findUnique({
-    where: { email },
-  });
-
-  if (existingAdmin) {
-    console.log(`✅ Admin ya existe: ${email}`);
-    return;
-  }
-
   const passwordHash = await bcrypt.hash(password, 10);
 
-  await prisma.user.create({
-    data: {
+  // Idempotente: si ya existe por email, no duplica
+  await prisma.user.upsert({
+    where: { email },
+    update: {
+      // opcional: si quieres actualizar datos cuando ya existe
+      name,
+      role: UserRole.ADMIN,
+      isActive: true,
+      // Si NO quieres reescribir password en cada deploy, comenta la siguiente línea
+      // password: passwordHash,
+    },
+    create: {
       name,
       email,
       password: passwordHash,
@@ -44,7 +37,7 @@ async function main() {
     },
   });
 
-  console.log(`🚀 Admin creado correctamente: ${email}`);
+  console.log(`✅ Seed OK: admin asegurado (${email})`);
 }
 
 main()
@@ -54,5 +47,4 @@ main()
   })
   .finally(async () => {
     await prisma.$disconnect();
-    await pool.end();
   });
