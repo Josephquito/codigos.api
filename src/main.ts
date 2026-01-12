@@ -1,10 +1,13 @@
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
-import * as dotenv from 'dotenv';
-
-dotenv.config();
 
 async function bootstrap() {
+  // Cargar .env SOLO en local
+  if (process.env.NODE_ENV !== 'production') {
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    require('dotenv').config();
+  }
+
   const app = await NestFactory.create(AppModule);
 
   app.enableCors({
@@ -19,8 +22,14 @@ async function bootstrap() {
     credentials: true,
   });
 
-  const port = Number(process.env.PORT || 3000);
-  await app.listen(port);
+  const port = Number(process.env.PORT) || 3000;
+
+  console.log('BOOT OK', {
+    port,
+    env: process.env.NODE_ENV,
+  });
+
+  await app.listen(port, '0.0.0.0');
 }
 
 bootstrap();
