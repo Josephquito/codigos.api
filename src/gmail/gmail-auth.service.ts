@@ -25,10 +25,6 @@ export class GmailAuthService {
 
   constructor(private readonly prisma: PrismaService) {}
 
-  // =========================
-  // Helpers
-  // =========================
-
   private normalizeEmail(email: string): string {
     return (email || '').trim().toLowerCase();
   }
@@ -44,42 +40,53 @@ export class GmailAuthService {
     const raw = process.env.GOOGLE_CREDENTIALS;
     if (!raw) throw new Error('GOOGLE_CREDENTIALS no está definido');
 
-    const credentials = JSON.parse(raw) as { web: OAuthCredentials };
-    if (!credentials?.web?.client_id || !credentials?.web?.client_secret) {
-      throw new Error('GOOGLE_CREDENTIALS inválido (faltan campos web.*)');
+    const parsed = JSON.parse(raw) as {
+      web?: OAuthCredentials;
+      installed?: OAuthCredentials;
+    };
+
+    // Acepta "web" o "installed" (por si exportaste el tipo equivocado)
+    const creds = parsed.web ?? parsed.installed;
+    if (!creds?.client_id || !creds?.client_secret) {
+      throw new Error(
+        'GOOGLE_CREDENTIALS inválido (faltan client_id/client_secret en web/installed)',
+      );
     }
 
-    return credentials.web;
+    return creds;
   }
 
-  /**
-   * OAuth2 client "vacío" (sin tokens seteados), útil para:
-   * - generateAuthUrl
-   * - revokeToken
-   */
+  private getRedirectUriFromEnvOrCredentials(creds: OAuthCredentials): string {
+    // Producción: fuerza redirect al backend público (Render)
+    const baseUrl = process.env.API_BASE_URL?.replace(/\/$/, '');
+    if (baseUrl) return `${baseUrl}/gmail/auth/google/callback`;
+
+    // Local/dev: usa el primer redirect_uris del JSON
+    const redirectUri = creds.redirect_uris?.[0];
+    if (!redirectUri) {
+      throw new Error(
+        'No se pudo determinar redirectUri. Define API_BASE_URL o agrega redirect_uris[0] en GOOGLE_CREDENTIALS.',
+      );
+    }
+
+    return redirectUri;
+  }
+
   buildOAuthClient() {
-    const { client_id, client_secret, redirect_uris } =
-      this.parseGoogleCredentials();
+    const creds = this.parseGoogleCredentials();
+    const redirectUri = this.getRedirectUriFromEnvOrCredentials(creds);
 
-    const redirectUri = redirect_uris?.[0];
-    if (!redirectUri)
-      throw new Error('GOOGLE_CREDENTIALS no tiene redirect_uris[0]');
-
-    return new google.auth.OAuth2(client_id, client_secret, redirectUri);
+    return new google.auth.OAuth2(
+      creds.client_id,
+      creds.client_secret,
+      redirectUri,
+    );
   }
 
   private getOAuthClient() {
     return this.buildOAuthClient();
   }
 
-  // =========================
-  // Public API
-  // =========================
-
-  /**
-   * Si quieres que "registrado" signifique "existe en DB" (aunque esté inactive),
-   * deja el select sin active. Si quieres "registrado y activo", filtra active=true.
-   */
   async isEmailRegistered(userId: number, email: string): Promise<boolean> {
     const e = this.normalizeEmail(email);
     this.assertGmail(e);
@@ -141,7 +148,6 @@ export class GmailAuthService {
 
     const existingToken = (existing?.token ?? null) as any;
 
-    // Mantener refresh_token previo si Google no lo entrega otra vez
     const newToken: Credentials = {
       access_token: token.access_token,
       expiry_date: token.expiry_date,
@@ -157,11 +163,6 @@ export class GmailAuthService {
     });
   }
 
-  /**
-   * Retorna OAuth client con credenciales seteadas y refrescadas si aplica.
-   * - Solo retorna client si token está activo y puede refrescar/usar access token.
-   * - Si falla (revocado/expirado), marca active=false.
-   */
   async loadClient(userId: number, email: string) {
     const e = this.normalizeEmail(email);
     this.assertGmail(e);
@@ -177,10 +178,8 @@ export class GmailAuthService {
     client.setCredentials(entry.token as any);
 
     try {
-      // Fuerza a validar/refrescar access token si es necesario
       const newAccessToken = await client.getAccessToken();
 
-      // Si rotó access_token, persistir credenciales actuales
       const currentAccess = (entry.token as any)?.access_token;
       if (newAccessToken?.token && newAccessToken.token !== currentAccess) {
         await this.prisma.gmailToken.update({
@@ -191,7 +190,6 @@ export class GmailAuthService {
 
       return client;
     } catch {
-      // Si refresh_token fue revocado o ya no sirve
       await this.prisma.gmailToken.update({
         where: { userId_email: { userId, email: e } },
         data: { active: false },
