@@ -19,6 +19,6 @@ export class GmailAuthController {
       '',
     );
 
-    return res.redirect(`${frontUrl}/gmail-register?connected=1`);
+    return res.redirect(`${frontUrl}/registrar`);
   }
 }
