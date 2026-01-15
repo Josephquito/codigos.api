@@ -1,8 +1,10 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
   Param,
+  ParseIntPipe,
   Patch,
   Post,
   Req,
@@ -15,21 +17,20 @@ import {
   SetActiveDto,
   SetCatchAllDto,
 } from './dto/imap.dto';
+import { UpdateImapAccountDto } from './dto/update-imap-account.dto';
 
 @Controller('imap')
 @UseGuards(JwtAuthGuard)
 export class ImapController {
   constructor(private readonly imap: ImapService) {}
 
-  // =========================
+  // ============================================================
   // Accounts (User)
-  // =========================
+  // ============================================================
 
-  /**
-   * Crear cuenta IMAP del usuario
-   */
+  /** Crea una cuenta IMAP del usuario autenticado */
   @Post('accounts')
-  async createAccount(@Req() req: any, @Body() dto: CreateImapAccountDto) {
+  createAccount(@Req() req: any, @Body() dto: CreateImapAccountDto) {
     return this.imap.registerAccount({
       userId: req.user.id,
       email: dto.email,
@@ -41,53 +42,58 @@ export class ImapController {
     });
   }
 
-  /**
-   * Listar mis cuentas IMAP
-   */
+  /** Lista mis cuentas IMAP (sin password) */
   @Get('accounts')
-  async listMyAccounts(@Req() req: any) {
+  listMyAccounts(@Req() req: any) {
     return this.imap.getMyAccounts(req.user.id);
   }
 
-  /**
-   * Activar/desactivar una cuenta (solo dueño)
-   */
-  @Patch('accounts/:id/active')
-  async setActive(
+  /** Edita una cuenta IMAP (solo dueño) */
+  @Patch('accounts/:id')
+  updateAccount(
     @Req() req: any,
-    @Param('id') id: string,
+    @Param('id', ParseIntPipe) id: number,
+    @Body() dto: UpdateImapAccountDto,
+  ) {
+    return this.imap.updateMyAccount(req.user.id, id, dto);
+  }
+
+  /** Elimina una cuenta IMAP (solo dueño) */
+  @Delete('accounts/:id')
+  deleteAccount(@Req() req: any, @Param('id', ParseIntPipe) id: number) {
+    return this.imap.deleteMyAccount(req.user.id, id);
+  }
+
+  /** Activa/desactiva una cuenta (solo dueño) */
+  @Patch('accounts/:id/active')
+  setActive(
+    @Req() req: any,
+    @Param('id', ParseIntPipe) id: number,
     @Body() dto: SetActiveDto,
   ) {
-    return this.imap.setMyAccountActive(req.user.id, Number(id), dto.active);
+    return this.imap.setMyAccountActive(req.user.id, id, dto.active);
   }
 
-  /**
-   * Marcar/desmarcar cuenta como catch-all (solo dueño)
-   * Nota: usuario puede tener múltiples catch-all (varios dominios)
-   */
+  /** Marca/desmarca una cuenta como catch-all (solo dueño) */
   @Patch('accounts/:id/catchall')
-  async setCatchAll(
+  setCatchAll(
     @Req() req: any,
-    @Param('id') id: string,
+    @Param('id', ParseIntPipe) id: number,
     @Body() dto: SetCatchAllDto,
   ) {
-    return this.imap.setMyAccountCatchAll(
-      req.user.id,
-      Number(id),
-      dto.isCatchAll,
-    );
+    return this.imap.setMyAccountCatchAll(req.user.id, id, dto.isCatchAll);
   }
 
-  // =========================
+  // ============================================================
   // Reading emails
-  // =========================
+  // ============================================================
 
   /**
-   * Leer desde catch-all (selección por dominio del aliasEmail)
-   * Frontend SIEMPRE envía aliasEmail con dominio: lalo@dominio.com
+   * Lee desde catch-all por dominio del aliasEmail.
+   * Frontend debe enviar aliasEmail con dominio: lalo@dominio.com
    */
   @Get('catchall/:aliasEmail/:platform')
-  async readFromCatchAll(
+  readFromCatchAll(
     @Req() req: any,
     @Param('aliasEmail') aliasEmail: string,
     @Param('platform') platform: string,
@@ -99,11 +105,9 @@ export class ImapController {
     });
   }
 
-  /**
-   * Leer desde una cuenta específica (del usuario) por plataforma
-   */
+  /** Lee desde una cuenta específica (del usuario) por plataforma */
   @Get('account/:email/:platform')
-  async readFromAccount(
+  readFromAccount(
     @Req() req: any,
     @Param('email') email: string,
     @Param('platform') platform: string,

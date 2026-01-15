@@ -1,137 +1,140 @@
-// cuentas/cuentas.service.ts
-import { Injectable } from '@nestjs/common';
+import {
+  Injectable,
+  ConflictException,
+  NotFoundException,
+  BadRequestException,
+} from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateCuentaDto } from './dto/create-cuenta.dto';
 import { UpdateCuentaDto } from './dto/update-cuenta.dto';
-
-type CuentaRow = {
-  correo: string;
-  disney: string;
-  netflix: string;
-  prime: string;
-  chatgpt: string;
-  crunchyroll: string;
-};
-
-function baseCuenta(correo: string): CuentaRow {
-  return {
-    correo,
-    disney: 'Sin asignar',
-    netflix: 'Sin asignar',
-    prime: 'Sin asignar',
-    chatgpt: 'Sin asignar',
-    crunchyroll: 'Sin asignar',
-  };
-}
 
 @Injectable()
 export class CuentasService {
   constructor(private readonly prisma: PrismaService) {}
 
-  async findAll(userId: number) {
-    const registros = await this.prisma.platformAccessKey.findMany({
+  private norm(v: string) {
+    return v.trim().toLowerCase();
+  }
+
+  private parseDateOrThrow(v: string): Date {
+    const d = new Date(v);
+    if (Number.isNaN(d.getTime()))
+      throw new BadRequestException('Fecha inválida');
+    return d;
+  }
+
+  /** Regla default: si no envían fecha, programo cambio en 30 días */
+  private defaultPasswordChangeAt() {
+    const d = new Date();
+    d.setDate(d.getDate() + 30);
+    return d;
+  }
+
+  /** Lista filas independientes (lo que tu UI necesita) */
+  findAll(userId: number) {
+    return this.prisma.platformAccessKey.findMany({
       where: { userId, active: true },
-      select: { emailAlias: true, plataforma: true, clave: true },
-      orderBy: [{ emailAlias: 'asc' }],
+      orderBy: { createdAt: 'desc' },
+      select: {
+        id: true,
+        emailAlias: true,
+        plataforma: true,
+        clave: true,
+        createdAt: true,
+        passwordChangeAt: true,
+      },
     });
-
-    const cuentasMap = new Map<string, CuentaRow>();
-
-    for (const reg of registros) {
-      const correo = reg.emailAlias.toLowerCase();
-      const plataforma = reg.plataforma.toLowerCase();
-
-      if (!cuentasMap.has(correo)) {
-        cuentasMap.set(correo, baseCuenta(correo));
-      }
-
-      const cuenta = cuentasMap.get(correo)!;
-
-      // Solo setea si la plataforma coincide con una propiedad
-      if (plataforma in cuenta) {
-        (cuenta as any)[plataforma] = reg.clave;
-      }
-    }
-
-    return Array.from(cuentasMap.values());
   }
 
-  async findByEmail(userId: number, email: string) {
-    const emailAlias = email.toLowerCase();
-
-    const registros = await this.prisma.platformAccessKey.findMany({
-      where: { userId, emailAlias, active: true },
-      select: { plataforma: true, clave: true },
-    });
-
-    if (registros.length === 0) return [];
-
-    const cuenta = baseCuenta(emailAlias);
-
-    for (const reg of registros) {
-      const plataforma = reg.plataforma.toLowerCase();
-      if (plataforma in cuenta) {
-        (cuenta as any)[plataforma] = reg.clave;
-      }
-    }
-
-    return [cuenta];
-  }
-
+  /** Crear fila (correo+plataforma independiente) */
   async create(userId: number, dto: CreateCuentaDto) {
-    return this.prisma.platformAccessKey.create({
-      data: {
-        userId,
-        emailAlias: dto.emailAlias.toLowerCase(),
-        plataforma: dto.plataforma.toLowerCase(),
-        clave: dto.clave,
-        active: true,
-      },
-    });
+    const emailAlias = this.norm(dto.emailAlias);
+    const plataforma = this.norm(dto.plataforma);
+
+    const passwordChangeAt = dto.passwordChangeAt
+      ? this.parseDateOrThrow(dto.passwordChangeAt)
+      : this.defaultPasswordChangeAt();
+
+    try {
+      return await this.prisma.platformAccessKey.create({
+        data: {
+          userId,
+          emailAlias,
+          plataforma,
+          clave: dto.clave,
+          active: true,
+          passwordChangeAt,
+        },
+        select: {
+          id: true,
+          emailAlias: true,
+          plataforma: true,
+          clave: true,
+          createdAt: true,
+          passwordChangeAt: true,
+        },
+      });
+    } catch (e: any) {
+      if (e?.code === 'P2002') {
+        throw new ConflictException(
+          'Ya existe esa plataforma para ese correo en este usuario',
+        );
+      }
+      throw e;
+    }
   }
 
-  async update(
-    userId: number,
-    emailAlias: string,
-    plataforma: string,
-    dto: UpdateCuentaDto,
-  ) {
+  /**
+   * Update por id (mucho más simple para CRUD por fila)
+   * - Si actualizas clave, normalmente reprogramas passwordChangeAt
+   *   a +30 días, a menos que el frontend envíe una fecha explícita.
+   */
+  async update(userId: number, id: number, dto: UpdateCuentaDto) {
+    const existing = await this.prisma.platformAccessKey.findFirst({
+      where: { id, userId },
+      select: { id: true },
+    });
+    if (!existing) throw new NotFoundException('Registro no encontrado');
+
+    const data: any = {};
+
+    if (typeof dto.clave === 'string') {
+      const c = dto.clave;
+      if (!c.trim()) throw new BadRequestException('Clave inválida');
+      data.clave = c;
+
+      // si no envían fecha, la reprogramo por default
+      data.passwordChangeAt = dto.passwordChangeAt
+        ? this.parseDateOrThrow(dto.passwordChangeAt)
+        : this.defaultPasswordChangeAt();
+    } else if (typeof dto.passwordChangeAt === 'string') {
+      // si solo reprograman fecha (sin cambiar clave)
+      data.passwordChangeAt = this.parseDateOrThrow(dto.passwordChangeAt);
+    }
+
     return this.prisma.platformAccessKey.update({
-      where: {
-        userId_plataforma_emailAlias: {
-          userId,
-          plataforma: plataforma.toLowerCase(),
-          emailAlias: emailAlias.toLowerCase(),
-        },
-      },
-      data: {
-        clave: dto.clave,
+      where: { id },
+      data,
+      select: {
+        id: true,
+        emailAlias: true,
+        plataforma: true,
+        clave: true,
+        createdAt: true,
+        passwordChangeAt: true,
       },
     });
   }
 
-  async remove(userId: number, emailAlias: string, plataforma: string) {
-    await this.prisma.platformAccessKey.delete({
-      where: {
-        userId_plataforma_emailAlias: {
-          userId,
-          plataforma: plataforma.toLowerCase(),
-          emailAlias: emailAlias.toLowerCase(),
-        },
-      },
+  /** Delete por id */
+  async remove(userId: number, id: number) {
+    const existing = await this.prisma.platformAccessKey.findFirst({
+      where: { id, userId },
+      select: { id: true },
     });
+    if (!existing) throw new NotFoundException('Registro no encontrado');
 
-    return true;
-  }
-
-  async eliminarCuentaCompleta(userId: number, emailAlias: string) {
-    const res = await this.prisma.platformAccessKey.deleteMany({
-      where: {
-        userId,
-        emailAlias: emailAlias.toLowerCase(),
-      },
-    });
-
-    return res.count > 0;
+    await this.prisma.platformAccessKey.delete({ where: { id } });
+    return { deleted: true, id };
   }
 }

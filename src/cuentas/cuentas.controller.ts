@@ -5,6 +5,7 @@ import {
   ForbiddenException,
   Get,
   Param,
+  ParseIntPipe,
   Patch,
   Post,
   Query,
@@ -12,17 +13,17 @@ import {
   UseGuards,
 } from '@nestjs/common';
 
+import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { UserRole } from '../generated/prisma/client';
+
 import { CuentasService } from './cuentas.service';
 import { CreateCuentaDto } from './dto/create-cuenta.dto';
 import { UpdateCuentaDto } from './dto/update-cuenta.dto';
 
-import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
-import { UserRole } from '../generated/prisma/client';
-
 @Controller('cuentas')
 @UseGuards(JwtAuthGuard)
 export class CuentasController {
-  constructor(private readonly cuentasService: CuentasService) {}
+  constructor(private readonly cuentas: CuentasService) {}
 
   private assertUserOrAdmin(role: UserRole) {
     if (role !== UserRole.USER && role !== UserRole.ADMIN) {
@@ -31,78 +32,77 @@ export class CuentasController {
   }
 
   // =========================
-  // Keys (USER + ADMIN)
+  // CRUD (fila independiente)
   // =========================
 
   /**
-   * Listar mis claves (USER + ADMIN)
+   * GET /cuentas
+   * Lista todas las cuentas del usuario (fila por cuenta)
+   *
+   * Opcional:
+   *  - /cuentas?email=correo@dominio.com
+   *  - /cuentas?platform=netflix
+   *  - /cuentas?email=...&platform=...
+   *
+   * Si no quieres filtros aquí, puedes quitarlos y filtrar en el frontend.
    */
-  @Get('keys')
-  async listMyKeys(@Req() req: any) {
-    this.assertUserOrAdmin(req.user.role);
-    return this.cuentasService.findAll(req.user.id);
-  }
-
-  /**
-   * Buscar mis claves por email alias (USER + ADMIN)
-   * /cuentas/keys/search?email=correo@dominio.com
-   */
-  @Get('keys/search')
-  async findMyKeysByEmail(@Req() req: any, @Query('email') email: string) {
-    this.assertUserOrAdmin(req.user.role);
-    return this.cuentasService.findByEmail(req.user.id, email);
-  }
-
-  /**
-   * Crear clave (USER + ADMIN)
-   * Body: { emailAlias, plataforma, clave }
-   */
-  @Post('keys')
-  async createKey(@Req() req: any, @Body() dto: CreateCuentaDto) {
-    this.assertUserOrAdmin(req.user.role);
-    return this.cuentasService.create(req.user.id, dto);
-  }
-
-  /**
-   * Actualizar clave (USER + ADMIN)
-   * PATCH /cuentas/keys/:emailAlias/:plataforma
-   * Body: { clave }
-   */
-  @Patch('keys/:emailAlias/:plataforma')
-  async updateKey(
+  @Get()
+  async list(
     @Req() req: any,
-    @Param('emailAlias') emailAlias: string,
-    @Param('plataforma') plataforma: string,
+    @Query('email') email?: string,
+    @Query('platform') platform?: string,
+  ) {
+    this.assertUserOrAdmin(req.user.role);
+
+    const rows = await this.cuentas.findAll(req.user.id);
+
+    // Filtros simples en controller (opcionales)
+    const qEmail = (email || '').trim().toLowerCase();
+    const qPlatform = (platform || '').trim().toLowerCase();
+
+    return rows.filter((r: any) => {
+      const okEmail = qEmail
+        ? (r.emailAlias || '').toLowerCase() === qEmail
+        : true;
+      const okPlatform = qPlatform
+        ? (r.plataforma || '').toLowerCase() === qPlatform
+        : true;
+      return okEmail && okPlatform;
+    });
+  }
+
+  /**
+   * POST /cuentas
+   * Crea una fila: { emailAlias, plataforma, clave, passwordChangeAt? }
+   */
+  @Post()
+  create(@Req() req: any, @Body() dto: CreateCuentaDto) {
+    this.assertUserOrAdmin(req.user.role);
+    return this.cuentas.create(req.user.id, dto);
+  }
+
+  /**
+   * PATCH /cuentas/:id
+   * Edita una fila por id:
+   *  - { clave? , passwordChangeAt? }
+   */
+  @Patch(':id')
+  update(
+    @Req() req: any,
+    @Param('id', ParseIntPipe) id: number,
     @Body() dto: UpdateCuentaDto,
   ) {
     this.assertUserOrAdmin(req.user.role);
-    return this.cuentasService.update(req.user.id, emailAlias, plataforma, dto);
+    return this.cuentas.update(req.user.id, id, dto);
   }
 
   /**
-   * Eliminar clave puntual (USER + ADMIN)
-   * DELETE /cuentas/keys/:emailAlias/:plataforma
+   * DELETE /cuentas/:id
+   * Elimina una fila por id
    */
-  @Delete('keys/:emailAlias/:plataforma')
-  async deleteKey(
-    @Req() req: any,
-    @Param('emailAlias') emailAlias: string,
-    @Param('plataforma') plataforma: string,
-  ) {
+  @Delete(':id')
+  remove(@Req() req: any, @Param('id', ParseIntPipe) id: number) {
     this.assertUserOrAdmin(req.user.role);
-    return this.cuentasService.remove(req.user.id, emailAlias, plataforma);
-  }
-
-  /**
-   * Eliminar todas mis claves de un alias (USER + ADMIN)
-   * DELETE /cuentas/keys/:emailAlias
-   */
-  @Delete('keys/:emailAlias')
-  async deleteAllKeysForAlias(
-    @Req() req: any,
-    @Param('emailAlias') emailAlias: string,
-  ) {
-    this.assertUserOrAdmin(req.user.role);
-    return this.cuentasService.eliminarCuentaCompleta(req.user.id, emailAlias);
+    return this.cuentas.remove(req.user.id, id);
   }
 }

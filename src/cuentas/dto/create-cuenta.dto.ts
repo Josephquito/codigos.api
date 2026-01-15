@@ -1,20 +1,25 @@
-// cuentas/dto/create-cuenta.dto.ts
-import { IsEmail, IsNotEmpty, IsString, MaxLength } from 'class-validator';
-import { Transform } from 'class-transformer';
+import {
+  IsNotEmpty,
+  IsString,
+  IsOptional,
+  IsDateString,
+} from 'class-validator';
 
 export class CreateCuentaDto {
-  @IsEmail()
-  @Transform(({ value }) => value?.toLowerCase())
+  @IsString()
+  @IsNotEmpty()
   emailAlias: string;
 
   @IsString()
   @IsNotEmpty()
-  @MaxLength(50)
-  @Transform(({ value }) => value?.toLowerCase())
   plataforma: string;
 
   @IsString()
   @IsNotEmpty()
-  @MaxLength(255)
   clave: string;
+
+  // ✅ fecha programada para cambio (YYYY-MM-DD o ISO)
+  @IsOptional()
+  @IsDateString()
+  passwordChangeAt?: string;
 }

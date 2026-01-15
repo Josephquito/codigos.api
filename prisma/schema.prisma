@@ -83,26 +83,27 @@ model GmailToken {
 }
 
 model PlatformAccessKey {
-  id         Int      @id @default(autoincrement())
-  userId     Int      @map("user_id")
+  id               Int      @id @default(autoincrement())
+  userId           Int
 
-  emailAlias String   @map("email_alias")
-  plataforma String   @map("plataforma")
-  clave      String   @map("clave")
-  active     Boolean  @default(true)
+  emailAlias       String
+  plataforma       String
+  clave            String
 
-  createdAt  DateTime @default(now()) @map("created_at")
-  updatedAt  DateTime @updatedAt      @map("updated_at")
+  passwordChangeAt DateTime
+  active            Boolean @default(true)
+
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  @@index([userId])
-
-  // Gestión: no se repite dentro del mismo usuario
-  @@unique([userId, plataforma, emailAlias])
-
-  // Público: el triple identifica 1 registro global
+  // 🔒 público
   @@unique([plataforma, emailAlias, clave])
 
-  @@map("platform_access_keys")
+  // 🔐 privado (panel)
+  @@unique([userId, plataforma, emailAlias])
+
+  @@index([userId])
 }
+

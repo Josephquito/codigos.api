@@ -31,7 +31,7 @@ export class UsersController {
   @Post()
   create(@Body() dto: CreateUserDto, @Req() req: any) {
     if (req.user.role !== UserRole.ADMIN) {
-      throw new Error('Solo ADMIN puede crear usuarios');
+      throw new ForbiddenException('Solo ADMIN puede crear usuarios');
     }
     return this.usersService.createUser(dto);
   }
@@ -39,7 +39,7 @@ export class UsersController {
   @Get()
   list(@Req() req: any) {
     if (req.user.role !== UserRole.ADMIN) {
-      throw new Error('Solo ADMIN puede listar usuarios');
+      throw new ForbiddenException('Solo ADMIN puede listar usuarios');
     }
     return this.usersService.listAllUsers();
   }

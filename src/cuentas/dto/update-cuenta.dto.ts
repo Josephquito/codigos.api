@@ -1,9 +1,12 @@
-// cuentas/dto/update-cuenta.dto.ts
-import { IsNotEmpty, IsString, MaxLength } from 'class-validator';
+import { IsOptional, IsString, IsDateString } from 'class-validator';
 
 export class UpdateCuentaDto {
+  @IsOptional()
   @IsString()
-  @IsNotEmpty()
-  @MaxLength(255)
-  clave: string;
+  clave?: string;
+
+  // ✅ permitir reprogramar la fecha
+  @IsOptional()
+  @IsDateString()
+  passwordChangeAt?: string;
 }
