@@ -15,28 +15,19 @@ export class CuentasService {
   private norm(v: string) {
     return v.trim().toLowerCase();
   }
+
   private parseDateOrThrow(v: string): Date {
-    const raw = (v || '').trim();
-    if (!raw) throw new BadRequestException('Fecha inválida');
-
-    const m = raw.match(/^(\d{4})-(\d{2})-(\d{2})$/);
-    if (m) {
-      const y = Number(m[1]);
-      const mo = Number(m[2]);
-      const d = Number(m[3]);
-
-      // 12:00 UTC => al convertir a local casi nunca cambia de día
-      const safeUtc = new Date(Date.UTC(y, mo - 1, d, 12, 0, 0, 0));
-      if (Number.isNaN(safeUtc.getTime())) {
-        throw new BadRequestException('Fecha inválida');
-      }
-      return safeUtc;
-    }
-
-    const dt = new Date(raw);
-    if (Number.isNaN(dt.getTime()))
+    const d = new Date(v);
+    if (Number.isNaN(d.getTime()))
       throw new BadRequestException('Fecha inválida');
-    return dt;
+    return d;
+  }
+
+  /** Regla default: si no envían fecha, programo cambio en 30 días */
+  private defaultPasswordChangeAt() {
+    const d = new Date();
+    d.setDate(d.getDate() + 30);
+    return d;
   }
 
   /** Lista filas independientes (lo que tu UI necesita) */
