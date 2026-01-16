@@ -13,6 +13,7 @@ import {
 } from '@nestjs/common';
 import { UsersService } from './users.service';
 import { CreateUserDto } from './dto/create-user.dto';
+import { UpdateUserDto } from './dto/update-user.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { UserRole } from '../generated/prisma/client';
 
@@ -36,6 +37,7 @@ export class UsersController {
     return this.usersService.createUser(dto);
   }
 
+  // 📋 Listar usuarios (ADMIN)
   @Get()
   list(@Req() req: any) {
     if (req.user.role !== UserRole.ADMIN) {
@@ -44,7 +46,32 @@ export class UsersController {
     return this.usersService.listAllUsers();
   }
 
+  // ✏️ Editar usuario (ADMIN) - name, email, role, isActive, password (opcional)
+  @Patch(':id')
+  updateUser(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() dto: UpdateUserDto,
+    @Req() req: any,
+  ) {
+    if (req.user.role !== UserRole.ADMIN) {
+      throw new ForbiddenException('Solo ADMIN puede modificar usuarios');
+    }
+
+    // ✅ Evita auto-desactivación por este endpoint también
+    if (req.user.id === id && dto.isActive === false) {
+      throw new ForbiddenException('No puedes desactivarte a ti mismo');
+    }
+
+    // ✅ (Opcional) Evita auto-bajarte el rol (si te interesa)
+    // if (req.user.id === id && dto.role && dto.role !== UserRole.ADMIN) {
+    //   throw new ForbiddenException('No puedes cambiar tu rol a uno inferior');
+    // }
+
+    return this.usersService.updateUserByAdmin(id, dto);
+  }
+
   // 🚫 Activar / desactivar usuario (ADMIN)
+  // (Puedes mantenerlo si tu UI lo usa como toggle rápido)
   @Patch(':id/active')
   setActive(
     @Param('id', ParseIntPipe) id: number,
