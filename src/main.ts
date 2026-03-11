@@ -18,6 +18,7 @@ async function bootstrap() {
       'http://www.jotavix.com',
       'https://www.jotavix.com',
       'https://connivant-maegan-overpiteous.ngrok-free.dev',
+      'https://codigos-app.vercel.app',
     ],
     credentials: true,
   });
