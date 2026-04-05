@@ -19,6 +19,8 @@ async function bootstrap() {
       'https://www.jotavix.com',
       'https://connivant-maegan-overpiteous.ngrok-free.dev',
       'https://codigos-app.vercel.app',
+      'https://codigos.jotavix.com',
+      'http://codigos.jotavix.com',
     ],
     credentials: true,
   });
