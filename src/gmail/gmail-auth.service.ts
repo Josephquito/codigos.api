@@ -22,8 +22,6 @@ type OAuthState = { userId: number; email: string; projectId: number };
 @Injectable()
 export class GmailAuthService {
   private readonly SCOPES = ['https://www.googleapis.com/auth/gmail.readonly'];
-
-  // Cuántos proyectos hay disponibles (lee del env)
   private readonly PROJECT_COUNT = this.resolveProjectCount();
 
   constructor(private readonly prisma: PrismaService) {}
@@ -48,14 +46,12 @@ export class GmailAuthService {
   }
 
   private parseCredentials(projectId: number): OAuthCredentials {
-    // Intenta GOOGLE_CREDENTIALS_N, fallback a GOOGLE_CREDENTIALS (legacy)
     const raw =
       process.env[`GOOGLE_CREDENTIALS_${projectId}`] ||
       (projectId === 1 ? process.env.GOOGLE_CREDENTIALS : undefined);
 
-    if (!raw) {
+    if (!raw)
       throw new Error(`No hay credenciales para el proyecto ${projectId}`);
-    }
 
     const parsed = JSON.parse(raw) as {
       web?: OAuthCredentials;
@@ -88,11 +84,9 @@ export class GmailAuthService {
     );
   }
 
-  // ✅ Detecta automáticamente el proyecto con menos cuentas registradas
   async resolveProjectId(userId: number): Promise<number> {
     if (this.PROJECT_COUNT <= 1) return 1;
 
-    // Cuenta cuántos tokens hay por proyecto (global, no solo del usuario)
     const counts = await this.prisma.gmailToken.groupBy({
       by: ['googleProjectId'],
       _count: { id: true },
@@ -102,7 +96,6 @@ export class GmailAuthService {
     for (let i = 1; i <= this.PROJECT_COUNT; i++) countMap[i] = 0;
     for (const row of counts) countMap[row.googleProjectId] = row._count.id;
 
-    // Elige el proyecto con menos cuentas (que no haya llegado a 100)
     let best = 1;
     let bestCount = Infinity;
     for (let i = 1; i <= this.PROJECT_COUNT; i++) {
@@ -125,12 +118,40 @@ export class GmailAuthService {
     return !!found;
   }
 
-  // ✅ Genera URL OAuth — elige proyecto automáticamente
+  // ✅ Para cuentas NUEVAS — elige proyecto con menos cuentas
   async generateAuthUrl(userId: number, email: string): Promise<string> {
     const e = this.normalizeEmail(email);
     this.assertGmail(e);
 
     const projectId = await this.resolveProjectId(userId);
+    const client = this.buildOAuthClient(projectId);
+    const state = base64urlEncode({
+      userId,
+      email: e,
+      projectId,
+    } satisfies OAuthState);
+
+    return client.generateAuthUrl({
+      access_type: 'offline',
+      prompt: 'consent',
+      scope: this.SCOPES,
+      state,
+    });
+  }
+
+  // ✅ Para RENOVAR — usa el proyecto donde ya está el token
+  async generateRenewUrl(userId: number, email: string): Promise<string> {
+    const e = this.normalizeEmail(email);
+    this.assertGmail(e);
+
+    const existing = await this.prisma.gmailToken.findUnique({
+      where: { userId_email: { userId, email: e } },
+      select: { googleProjectId: true },
+    });
+
+    // Si existe usa su proyecto original, si no existe usa resolveProjectId
+    const projectId =
+      existing?.googleProjectId ?? (await this.resolveProjectId(userId));
     const client = this.buildOAuthClient(projectId);
     const state = base64urlEncode({
       userId,
@@ -210,7 +231,6 @@ export class GmailAuthService {
 
     if (!entry || !entry.active) return null;
 
-    // Usa el proyecto correcto para este token
     const client = this.buildOAuthClient(entry.googleProjectId ?? 1);
     client.setCredentials(entry.token as any);
 

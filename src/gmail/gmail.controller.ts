@@ -63,21 +63,23 @@ export class GmailController {
     return { url };
   }
 
+  // ✅ Usa generateRenewUrl — respeta el proyecto original del token
   @Get('renew-url/:email')
   async renewUrl(@Req() req: any, @Param('email') email: string) {
     this.assertGmail(email);
-    const url = await this.gmailAuthService.generateAuthUrl(req.user.id, email);
+    const url = await this.gmailAuthService.generateRenewUrl(
+      req.user.id,
+      email,
+    );
     return { url };
   }
 
-  /** Buzón general — últimos 5 correos de una cuenta Gmail via OAuth */
   @Get('buzon/:email')
   async getBuzon(@Req() req: any, @Param('email') email: string) {
     this.assertGmail(email);
     return this.gmailService.getLatestEmails(req.user.id, email, 5);
   }
 
-  /** Lee por alias + plataforma via OAuth */
   @Get('alias/:email/platform/:platform')
   async filterGmailAliasPlatform(
     @Req() req: any,
