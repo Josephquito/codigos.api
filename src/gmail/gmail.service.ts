@@ -23,6 +23,14 @@ export class GmailService {
     }
   }
 
+  /** Normaliza alias + al email base: mortycadeyos+cc@gmail.com → mortycadeyos@gmail.com */
+  private normalizeGmailAlias(email: string): string {
+    const norm = (email || '').trim().toLowerCase();
+    const [local, domain] = norm.split('@');
+    if (!domain) return norm;
+    return `${local.split('+')[0]}@${domain}`;
+  }
+
   async tokenExists(userId: number, email: string): Promise<boolean> {
     this.assertGmail(email);
     const found = await this.prisma.gmailToken.findUnique({
@@ -60,13 +68,11 @@ export class GmailService {
     return { deleted: true, email };
   }
 
-  // ✅ async porque generateAuthUrl ahora es async
   async getAuthUrl(userId: number, email: string): Promise<string> {
     this.assertGmail(email);
     return this.gmailAuthService.generateAuthUrl(userId, email);
   }
 
-  // ✅ Buzón general — últimos N correos via OAuth
   async getLatestEmails(
     userId: number,
     email: string,
@@ -123,7 +129,6 @@ export class GmailService {
     return results;
   }
 
-  // ✅ Lectura por alias/plataforma
   async getEmailsForAliasFromPlatform(
     userId: number,
     alias: string,
@@ -131,8 +136,12 @@ export class GmailService {
   ): Promise<string[]> {
     this.assertGmail(alias);
 
-    const auth = await this.gmailAuthService.loadClient(userId, alias);
-    if (!auth) return [`<p>❌ No se encontró token activo para ${alias}</p>`];
+    // ✅ Normaliza alias + para cargar el token de la cuenta base
+    const baseEmail = this.normalizeGmailAlias(alias);
+
+    const auth = await this.gmailAuthService.loadClient(userId, baseEmail);
+    if (!auth)
+      return [`<p>❌ No se encontró token activo para ${baseEmail}</p>`];
 
     const gmail = google.gmail({ version: 'v1', auth });
     const twelveHoursAgo = Date.now() - 12 * 60 * 60 * 1000;
