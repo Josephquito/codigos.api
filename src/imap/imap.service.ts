@@ -1,4 +1,3 @@
-// src/imap/imap.service.ts
 import {
   Injectable,
   BadRequestException,
@@ -43,12 +42,10 @@ export class ImapService {
   // Helpers básicos
   // ============================================================
 
-  /** Normaliza un email para comparaciones y guardado consistente */
   private normEmail(email: string): string {
     return (email || '').trim().toLowerCase();
   }
 
-  /** Extrae dominio del email (requiere formato usuario@dominio) */
   private domainFromEmail(email: string): string {
     const parts = this.normEmail(email).split('@');
     if (parts.length !== 2 || !parts[1]) {
@@ -59,7 +56,14 @@ export class ImapService {
     return parts[1];
   }
 
-  /** Construye configuración IMAP para imap-simple */
+  private assertNotGmail(email: string): void {
+    if (/@gmail\.com$/i.test(email)) {
+      throw new BadRequestException(
+        'Las cuentas Gmail se gestionan en el módulo /gmail, no en /imap',
+      );
+    }
+  }
+
   private imapOptions(params: {
     email: string;
     password: string;
@@ -69,15 +73,6 @@ export class ImapService {
   }): imaps.ImapSimpleOptions {
     const host = (params.host || '').trim().toLowerCase();
     const port = Number(params.port) || 993;
-
-    // Logs internos (no exponer al usuario)
-    console.log('[IMAP] host=', host, 'port=', port, 'tls=', !!params.useTls);
-    console.log(
-      '[IMAP] user=',
-      params.email,
-      'passLen=',
-      params.password?.length || 0,
-    );
 
     return {
       imap: {
@@ -93,7 +88,6 @@ export class ImapService {
     };
   }
 
-  /** Cierra conexión IMAP de forma segura */
   private async closeImap(imap?: ImapSimple) {
     if (!imap) return;
     try {
@@ -105,7 +99,6 @@ export class ImapService {
     } catch {}
   }
 
-  /** Devuelve el contenido (HTML/text) de un correo parseado */
   private mailContent(parsed: ParsedMail): string {
     return (
       (parsed.html as string) ||
@@ -115,30 +108,91 @@ export class ImapService {
     );
   }
 
-  /** Obtiene el "to" principal en formato email (si existe) */
   private getToAddress(parsed: ParsedMail): string {
     try {
       const anyTo: any = parsed.to as any;
-
-      // Caso típico mailparser: { value: [{ address: 'x@y.com' }] }
       if (anyTo?.value?.[0]?.address)
         return String(anyTo.value[0].address).toLowerCase();
-
-      // Otros casos
       if (Array.isArray(anyTo) && anyTo[0]?.address)
         return String(anyTo[0].address).toLowerCase();
     } catch {}
-
     return '';
+  }
+
+  // ============================================================
+  // Resolución de cuenta
+  // ============================================================
+
+  /**
+   * Dado un email (puede ser alias o cuenta real), resuelve qué ImapAccount usar:
+   * 1. Busca cuenta exacta activa
+   * 2. Si no existe, busca catch-all del dominio
+   * Retorna { account, isCatchAllResolved, requestedAlias }
+   */
+  private async resolveAccount(
+    userId: number,
+    email: string,
+  ): Promise<{
+    account: any;
+    isCatchAllResolved: boolean;
+    requestedAlias: string;
+  }> {
+    const normalized = this.normEmail(email);
+
+    // 1) Cuenta exacta
+    const exact = await this.prisma.imapAccount.findFirst({
+      where: { userId, email: normalized, active: true },
+    });
+    if (exact) {
+      return {
+        account: exact,
+        isCatchAllResolved: false,
+        requestedAlias: normalized,
+      };
+    }
+
+    // 2) Catch-all del dominio
+    const domain = this.domainFromEmail(normalized);
+    const catchAll = await this.prisma.imapAccount.findFirst({
+      where: {
+        userId,
+        isCatchAll: true,
+        active: true,
+        email: { endsWith: `@${domain}` },
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    if (!catchAll) {
+      throw new NotFoundException(
+        `❌ No tienes cuenta activa ni catch-all para el dominio ${domain}.`,
+      );
+    }
+
+    return {
+      account: catchAll,
+      isCatchAllResolved: true,
+      requestedAlias: normalized,
+    };
+  }
+
+  private async getAccountForUser(userId: number, email: string) {
+    const acc = await this.prisma.imapAccount.findFirst({
+      where: { userId, email: this.normEmail(email) },
+    });
+    if (!acc || !acc.active)
+      throw new ForbiddenException('No tienes acceso a este correo');
+    return acc;
   }
 
   // ============================================================
   // Gestión de cuentas IMAP (CRUD)
   // ============================================================
 
-  /** Crea una cuenta IMAP para el usuario (no permite duplicados por usuario) */
   async registerAccount(input: RegisterAccountInput) {
     const email = this.normEmail(input.email);
+    this.assertNotGmail(email);
+
     const password = (input.password || '').trim();
     const imapHost = (input.imapHost || '').trim();
     const imapPort = input.imapPort ?? 993;
@@ -185,7 +239,6 @@ export class ImapService {
     }
   }
 
-  /** Lista las cuentas del usuario (sin password) */
   async getMyAccounts(userId: number) {
     return this.prisma.imapAccount.findMany({
       where: { userId },
@@ -203,28 +256,23 @@ export class ImapService {
     });
   }
 
-  /** Elimina una cuenta IMAP del usuario */
   async deleteMyAccount(userId: number, accountId: number) {
     const acc = await this.prisma.imapAccount.findFirst({
       where: { id: accountId, userId },
       select: { id: true, email: true },
     });
     if (!acc) throw new NotFoundException('Cuenta no encontrada');
-
     await this.prisma.imapAccount.delete({ where: { id: accountId } });
     return { deleted: true, id: acc.id, email: acc.email };
   }
 
-  /** Activa/desactiva una cuenta del usuario */
   async setMyAccountActive(userId: number, accountId: number, active: boolean) {
-    // ownership enforced
     const acc = await this.prisma.imapAccount.findFirst({
       where: { id: accountId, userId },
       select: { id: true, isCatchAll: true },
     });
     if (!acc) throw new NotFoundException('Cuenta no encontrada');
 
-    // Si queda inactiva, apagamos catch-all automáticamente (regla simple)
     const data: any = { active: !!active };
     if (!active) data.isCatchAll = false;
 
@@ -243,7 +291,6 @@ export class ImapService {
     });
   }
 
-  /** Marca/desmarca catch-all; requiere que la cuenta esté activa */
   async setMyAccountCatchAll(
     userId: number,
     accountId: number,
@@ -268,7 +315,6 @@ export class ImapService {
     });
   }
 
-  /** Edita una cuenta IMAP del usuario (host/port/tls/email/password/active/catchall) */
   async updateMyAccount(
     userId: number,
     accountId: number,
@@ -297,7 +343,6 @@ export class ImapService {
           createdAt: true,
         },
       });
-
       return { message: '✅ Cuenta IMAP actualizada', account };
     } catch (e: any) {
       if (e?.code === 'P2002') {
@@ -309,11 +354,13 @@ export class ImapService {
     }
   }
 
-  /** Construye el "data" de Prisma para update con validaciones mínimas */
   private buildUpdateData(dto: UpdateAccountInput, currentActive: boolean) {
     const data: any = {};
 
-    if (dto.email !== undefined) data.email = this.normEmail(dto.email);
+    if (dto.email !== undefined) {
+      this.assertNotGmail(dto.email);
+      data.email = this.normEmail(dto.email);
+    }
     if (dto.password !== undefined) {
       const pass = (dto.password || '').trim();
       if (!pass) throw new BadRequestException('password no puede estar vacía');
@@ -332,14 +379,10 @@ export class ImapService {
       data.imapPort = port;
     }
     if (dto.useTls !== undefined) data.useTls = !!dto.useTls;
-
-    // Si actualizas active, y queda false => apagar catch-all
     if (dto.active !== undefined) {
       data.active = !!dto.active;
       if (!data.active) data.isCatchAll = false;
     }
-
-    // Si actualizas catch-all, exige que la cuenta quede activa
     if (dto.isCatchAll !== undefined) {
       const finalActive =
         dto.active !== undefined ? !!dto.active : currentActive;
@@ -355,100 +398,125 @@ export class ImapService {
   }
 
   // ============================================================
-  // Lectura IMAP (unificada)
+  // Lectura de correos
   // ============================================================
 
-  /** Obtiene credenciales de una cuenta del usuario (no filtra info sensible en errores) */
-  private async getAccountForUser(userId: number, email: string) {
-    const acc = await this.prisma.imapAccount.findFirst({
-      where: { userId, email: this.normEmail(email) },
-    });
-
-    // Mensaje único para no filtrar si existe o está inactiva
-    if (!acc || !acc.active)
-      throw new ForbiddenException('No tienes acceso a este correo');
-
-    return acc;
-  }
-
-  /** Resuelve catch-all por dominio del alias (debe existir y estar activa) */
-  private async resolveCatchAll(userId: number, aliasEmail: string) {
-    const domain = this.domainFromEmail(aliasEmail);
-
-    const acc = await this.prisma.imapAccount.findFirst({
-      where: {
-        userId,
-        isCatchAll: true,
-        active: true,
-        email: { endsWith: `@${domain}` },
-      },
-      orderBy: { createdAt: 'desc' },
-    });
-
-    if (!acc) {
-      throw new NotFoundException(
-        `❌ No tienes un catch-all activo para el dominio ${domain}. Marca como catch-all una cuenta de ese dominio.`,
-      );
-    }
-
-    return acc;
-  }
-
   /**
-   * Catch-all por dominio: devuelve el correo más reciente de una plataforma para un alias (últimas 12h)
+   * Buzón general — últimos N correos.
+   * - Cuenta exacta: devuelve los últimos N sin filtro de To
+   * - Catch-all resuelto: filtra por To del alias solicitado
    */
-  async getEmailsForAliasFromPlatform(params: {
+  async getLatestEmails(params: {
     userId: number;
-    aliasEmail: string;
-    platform: string;
-  }): Promise<string[]> {
-    const acc = await this.resolveCatchAll(params.userId, params.aliasEmail);
-    return this.readLatestByPlatform({
-      account: acc,
-      platform: params.platform,
-      aliasEmail: params.aliasEmail, // filtra por "To"
-    });
+    email: string;
+    limit?: number;
+  }): Promise<{ subject: string; from: string; date: string; html: string }[]> {
+    this.assertNotGmail(params.email);
+
+    const { account, isCatchAllResolved, requestedAlias } =
+      await this.resolveAccount(params.userId, params.email);
+
+    const limit = params.limit ?? 5;
+    let imap: ImapSimple | undefined;
+
+    try {
+      imap = await imaps.connect(
+        this.imapOptions({
+          email: account.email,
+          password: (account.password || '').trim(),
+          host: account.imapHost,
+          port: account.imapPort,
+          useTls: account.useTls,
+        }),
+      );
+      await imap.openBox('INBOX');
+
+      const since = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+      const messages = await imap.search([['SINCE', since]], {
+        bodies: [''],
+        markSeen: false,
+      });
+
+      const results: {
+        subject: string;
+        from: string;
+        date: string;
+        html: string;
+      }[] = [];
+
+      // Procesa de más reciente a más antiguo
+      for (const msg of [...messages].reverse()) {
+        if (results.length >= limit) break;
+
+        const body = (msg.parts as any[]).find((p) => p.which === '')?.body;
+        if (!body) continue;
+
+        const parsed = await simpleParser(body as Source);
+
+        // Si llegamos por catch-all, filtramos por To del alias solicitado
+        if (isCatchAllResolved) {
+          const toAddr = this.getToAddress(parsed);
+          if (!toAddr.includes(requestedAlias)) continue;
+        }
+
+        results.push({
+          subject: parsed.subject || '(sin asunto)',
+          from: parsed.from?.text || '',
+          date: parsed.date?.toISOString() || '',
+          html: this.mailContent(parsed),
+        });
+      }
+
+      return results;
+    } catch (err: any) {
+      if (err instanceof HttpException) throw err;
+      console.error('❌ Error IMAP buzón general:', err);
+      return [];
+    } finally {
+      await this.closeImap(imap);
+    }
   }
 
   /**
-   * Cuenta específica: devuelve el correo más reciente de una plataforma (últimas 12h)
+   * Lectura por plataforma.
+   * - Cuenta exacta: filtra solo por remitentes de plataforma
+   * - Catch-all resuelto: filtra por To del alias + remitentes de plataforma
    */
-  async getEmailsFromAccountByPlatform(params: {
+  async getEmailsForAlias(params: {
     userId: number;
     email: string;
     platform: string;
   }): Promise<string[]> {
-    const acc = await this.getAccountForUser(params.userId, params.email);
+    this.assertNotGmail(params.email);
+
+    const { account, isCatchAllResolved, requestedAlias } =
+      await this.resolveAccount(params.userId, params.email);
+
     return this.readLatestByPlatform({
-      account: acc,
+      account,
       platform: params.platform,
-      aliasEmail: undefined, // no filtra por "To"
+      aliasEmail: isCatchAllResolved ? requestedAlias : undefined,
     });
   }
 
-  /**
-   * Lee INBOX y devuelve el correo más reciente de la plataforma (últimas 12h).
-   * - Si aliasEmail está definido, también filtra por destinatario (To)
-   */
   private async readLatestByPlatform(params: {
-    account: any; // imapAccount completo (incluye password)
+    account: any;
     platform: string;
     aliasEmail?: string;
   }): Promise<string[]> {
     const { account, platform, aliasEmail } = params;
-
     let imap: ImapSimple | undefined;
 
     try {
-      const config = this.imapOptions({
-        email: account.email,
-        password: (account.password || '').trim(),
-        host: account.imapHost,
-        port: account.imapPort,
-        useTls: account.useTls,
-      });
-
-      imap = await imaps.connect(config);
+      imap = await imaps.connect(
+        this.imapOptions({
+          email: account.email,
+          password: (account.password || '').trim(),
+          host: account.imapHost,
+          port: account.imapPort,
+          useTls: account.useTls,
+        }),
+      );
       await imap.openBox('INBOX');
 
       const since = new Date(Date.now() - 12 * 60 * 60 * 1000);
@@ -464,13 +532,12 @@ export class ImapService {
       let best: { date: number; html: string } | null = null;
 
       for (const msg of messages) {
-        const parts = (msg.parts as any[]) || [];
-        const body = parts.find((p) => p.which === '')?.body;
+        const body = (msg.parts as any[]).find((p) => p.which === '')?.body;
         if (!body) continue;
 
         const parsed = await simpleParser(body as Source);
 
-        // Si hay alias: valida el destinatario
+        // Filtra por To solo si llegamos por catch-all
         if (normalizedAlias) {
           const toAddr = this.getToAddress(parsed);
           if (!toAddr.includes(normalizedAlias)) continue;
@@ -488,24 +555,19 @@ export class ImapService {
         if (received <= since.getTime()) continue;
 
         const html = this.mailContent(parsed);
-
         if (!best || received > best.date) best = { date: received, html };
       }
 
       if (!best) {
-        const labelEmail = normalizedAlias
-          ? normalizedAlias
-          : this.normEmail(account.email);
+        const label = normalizedAlias ?? this.normEmail(account.email);
         return [
-          `<p>❌ No hay correos recientes de <b>${platform}</b> para <b>${labelEmail}</b> en las últimas 12h.</p>`,
+          `<p>❌ No hay correos recientes de <b>${platform}</b> para <b>${label}</b> en las últimas 12h.</p>`,
         ];
       }
 
       return [best.html];
     } catch (err: any) {
-      // No ocultar errores controlados (403/400/404/etc.)
       if (err instanceof HttpException) throw err;
-
       console.error('❌ Error IMAP:', err);
       return ['<p>Error al filtrar correos</p>'];
     } finally {

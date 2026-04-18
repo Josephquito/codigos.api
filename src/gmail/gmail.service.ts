@@ -25,56 +25,105 @@ export class GmailService {
 
   async tokenExists(userId: number, email: string): Promise<boolean> {
     this.assertGmail(email);
-
     const found = await this.prisma.gmailToken.findUnique({
       where: { userId_email: { userId, email } },
       select: { id: true, active: true },
     });
-
     return !!found?.id && !!found.active;
   }
 
-  // ✅ 2) Listar mis cuentas Gmail registradas
   async listMyAccounts(userId: number) {
-    const rows = await this.prisma.gmailToken.findMany({
+    return this.prisma.gmailToken.findMany({
       where: { userId },
       select: {
         id: true,
         email: true,
         active: true,
+        googleProjectId: true,
         createdAt: true,
         updatedAt: true,
       },
       orderBy: { createdAt: 'desc' },
     });
-
-    return rows;
   }
 
-  // ✅ 4) Eliminar cuenta (solo dueño)
   async deleteMyAccount(userId: number, email: string) {
     this.assertGmail(email);
-
     const row = await this.prisma.gmailToken.findUnique({
       where: { userId_email: { userId, email } },
-      select: { id: true, token: true },
+      select: { id: true },
     });
-
     if (!row) throw new NotFoundException('Cuenta no registrada');
-
     await this.prisma.gmailToken.delete({
       where: { userId_email: { userId, email } },
     });
-
     return { deleted: true, email };
   }
 
-  getAuthUrl(userId: number, email: string): string {
+  // ✅ async porque generateAuthUrl ahora es async
+  async getAuthUrl(userId: number, email: string): Promise<string> {
     this.assertGmail(email);
     return this.gmailAuthService.generateAuthUrl(userId, email);
   }
 
-  // ✅ 5) Lectura por alias/plataforma (tu método, endurecido)
+  // ✅ Buzón general — últimos N correos via OAuth
+  async getLatestEmails(
+    userId: number,
+    email: string,
+    limit = 5,
+  ): Promise<{ subject: string; from: string; date: string; html: string }[]> {
+    this.assertGmail(email);
+
+    const auth = await this.gmailAuthService.loadClient(userId, email);
+    if (!auth) return [];
+
+    const gmail = google.gmail({ version: 'v1', auth });
+
+    const listRes = await gmail.users.messages.list({
+      userId: 'me',
+      maxResults: limit,
+    });
+
+    const messages = listRes.data.messages ?? [];
+    if (messages.length === 0) return [];
+
+    const results: {
+      subject: string;
+      from: string;
+      date: string;
+      html: string;
+    }[] = [];
+
+    for (const msg of messages) {
+      if (!msg.id) continue;
+
+      const res = await gmail.users.messages.get({
+        userId: 'me',
+        id: msg.id,
+        format: 'raw',
+      });
+
+      const raw = res.data.raw;
+      if (!raw) continue;
+
+      const parsed: ParsedMail = await simpleParser(Buffer.from(raw, 'base64'));
+
+      results.push({
+        subject: parsed.subject || '(sin asunto)',
+        from: parsed.from?.text || '',
+        date: parsed.date?.toISOString() || '',
+        html:
+          (parsed.html as string) ||
+          (parsed.textAsHtml as string) ||
+          parsed.text ||
+          '<p>Correo sin contenido</p>',
+      });
+    }
+
+    return results;
+  }
+
+  // ✅ Lectura por alias/plataforma
   async getEmailsForAliasFromPlatform(
     userId: number,
     alias: string,
@@ -86,7 +135,6 @@ export class GmailService {
     if (!auth) return [`<p>❌ No se encontró token activo para ${alias}</p>`];
 
     const gmail = google.gmail({ version: 'v1', auth });
-
     const twelveHoursAgo = Date.now() - 12 * 60 * 60 * 1000;
 
     const listRes = await gmail.users.messages.list({
@@ -95,13 +143,10 @@ export class GmailService {
       q: 'newer_than:12h',
     });
 
-    const messages = Array.isArray(listRes.data.messages)
-      ? listRes.data.messages
-      : [];
-
+    const messages = listRes.data.messages ?? [];
     const messageIds = messages
       .map((m) => m.id)
-      .filter((id): id is string => typeof id === 'string' && id.length > 0);
+      .filter((id): id is string => !!id);
 
     if (messageIds.length === 0) {
       return [`<p>❌ No hay correos recientes (últimas 12h) para revisar</p>`];

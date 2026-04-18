@@ -65,12 +65,12 @@ model ImapAccount {
 }
 
 model GmailToken {
-  id        Int      @id @default(autoincrement())
-  userId    Int      @map("user_id")
-
-  email     String   // Puede repetirse en distintos usuarios
-  token     Json     @db.JsonB
-  active    Boolean  @default(true)
+  id              Int      @id @default(autoincrement())
+  userId          Int      @map("user_id")
+  email           String
+  token           Json     @db.JsonB
+  active          Boolean  @default(true)
+  googleProjectId Int      @default(1) @map("google_project_id") // ← nuevo
 
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt      @map("updated_at")
@@ -78,7 +78,7 @@ model GmailToken {
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
-  @@unique([userId, email]) // Unicidad por usuario
+  @@unique([userId, email])
   @@map("gmail_tokens")
 }
 

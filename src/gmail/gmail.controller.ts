@@ -28,29 +28,27 @@ export class GmailController {
   @Get('check/:email')
   async checkIfRegistered(@Req() req: any, @Param('email') email: string) {
     this.assertGmail(email);
-    const userId = req.user.id;
-    const exists = await this.gmailAuthService.isEmailRegistered(userId, email);
+    const exists = await this.gmailAuthService.isEmailRegistered(
+      req.user.id,
+      email,
+    );
     return { exists };
   }
 
-  // ✅ 2) listar mis cuentas gmail
   @Get('accounts')
   async listMyAccounts(@Req() req: any) {
     return this.gmailService.listMyAccounts(req.user.id);
   }
 
-  // ✅ 4) eliminar mi cuenta gmail
   @Delete('accounts/:email')
   async deleteMyAccount(@Req() req: any, @Param('email') email: string) {
     this.assertGmail(email);
     return this.gmailService.deleteMyAccount(req.user.id, email);
   }
 
-  // ✅ URL OAuth para el front (evita 401 por redirect sin headers)
   @Get('login-url/:email')
   async loginUrl(@Req() req: any, @Param('email') email: string) {
     this.assertGmail(email);
-
     const userId = req.user.id;
     const alreadyExists = await this.gmailAuthService.isEmailRegistered(
       userId,
@@ -61,20 +59,25 @@ export class GmailController {
         `El correo ${email} ya está registrado para este usuario`,
       );
     }
-
-    const url = this.gmailAuthService.generateAuthUrl(userId, email);
+    const url = await this.gmailAuthService.generateAuthUrl(userId, email);
     return { url };
   }
 
   @Get('renew-url/:email')
   async renewUrl(@Req() req: any, @Param('email') email: string) {
     this.assertGmail(email);
-    const userId = req.user.id;
-    const url = this.gmailAuthService.generateAuthUrl(userId, email);
+    const url = await this.gmailAuthService.generateAuthUrl(req.user.id, email);
     return { url };
   }
 
-  // ✅ 5) leer por alias + plataforma
+  /** Buzón general — últimos 5 correos de una cuenta Gmail via OAuth */
+  @Get('buzon/:email')
+  async getBuzon(@Req() req: any, @Param('email') email: string) {
+    this.assertGmail(email);
+    return this.gmailService.getLatestEmails(req.user.id, email, 5);
+  }
+
+  /** Lee por alias + plataforma via OAuth */
   @Get('alias/:email/platform/:platform')
   async filterGmailAliasPlatform(
     @Req() req: any,
@@ -82,9 +85,8 @@ export class GmailController {
     @Param('platform') platform: string,
   ) {
     this.assertGmail(email);
-    const userId = req.user.id;
     const correos = await this.gmailService.getEmailsForAliasFromPlatform(
-      userId,
+      req.user.id,
       email,
       platform,
     );

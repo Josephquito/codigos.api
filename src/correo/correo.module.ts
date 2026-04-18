@@ -6,10 +6,11 @@ import { CorreoService } from './correo.service';
 import { PlataformasModule } from '../plataformas/plataformas.module';
 import { GmailModule } from '../gmail/gmail.module';
 import { ImapModule } from '../imap/imap.module';
+import { PrismaService } from '../prisma/prisma.service';
 
 @Module({
   imports: [PlataformasModule, GmailModule, ImapModule],
   controllers: [CorreoController],
-  providers: [CorreoService],
+  providers: [CorreoService, PrismaService],
 })
 export class CorreoModule {}

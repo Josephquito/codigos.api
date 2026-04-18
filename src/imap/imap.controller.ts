@@ -28,7 +28,7 @@ export class ImapController {
   // Accounts (User)
   // ============================================================
 
-  /** Crea una cuenta IMAP del usuario autenticado */
+  /** Crea una cuenta IMAP (dominio propio, Outlook, catch-all) — NO Gmail */
   @Post('accounts')
   createAccount(@Req() req: any, @Body() dto: CreateImapAccountDto) {
     return this.imap.registerAccount({
@@ -88,31 +88,20 @@ export class ImapController {
   // Reading emails
   // ============================================================
 
-  /**
-   * Lee desde catch-all por dominio del aliasEmail.
-   * Frontend debe enviar aliasEmail con dominio: lalo@dominio.com
-   */
-  @Get('catchall/:aliasEmail/:platform')
-  readFromCatchAll(
-    @Req() req: any,
-    @Param('aliasEmail') aliasEmail: string,
-    @Param('platform') platform: string,
-  ) {
-    return this.imap.getEmailsForAliasFromPlatform({
-      userId: req.user.id,
-      aliasEmail,
-      platform,
-    });
+  /** Buzón general: últimos 5 correos (filtra por alias si resuelve catch-all) */
+  @Get('buzon/:email')
+  getBuzon(@Req() req: any, @Param('email') email: string) {
+    return this.imap.getLatestEmails({ userId: req.user.id, email, limit: 5 });
   }
 
-  /** Lee desde una cuenta específica (del usuario) por plataforma */
-  @Get('account/:email/:platform')
-  readFromAccount(
+  /** Lee correos de una plataforma para un email o alias */
+  @Get('email/:email/platform/:platform')
+  readEmails(
     @Req() req: any,
     @Param('email') email: string,
     @Param('platform') platform: string,
   ) {
-    return this.imap.getEmailsFromAccountByPlatform({
+    return this.imap.getEmailsForAlias({
       userId: req.user.id,
       email,
       platform,
